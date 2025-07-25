@@ -18,7 +18,7 @@ if __name__ == '__main__':
     sampler = FrameSampler(VIDEO_DIR, FRAME_DIR, batch_size=16)
     shot_infos = sampler.run()
 
-    shot_infos.to_json(SHOT_INFOS_PATH, 'records', indent=2)
+    shot_infos.to_json(SHOT_INFOS_PATH, orient='records', indent=2)
 
     with open(SHOT_INFOS_PATH) as f:
         shot_infos = json.load(f)
@@ -27,7 +27,7 @@ if __name__ == '__main__':
 
     with open(FEATURES_PATH, 'wb') as f:
         pickle.dump(all_features, f)
-    metadata.to_json(METADATA_PATH, 'records', indent=2)
+    metadata.to_json(METADATA_PATH, orient='records', indent=2)
 
     with open(FEATURES_PATH, 'rb') as f:
         all_features = pickle.load(f)
