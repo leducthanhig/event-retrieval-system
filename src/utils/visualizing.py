@@ -11,12 +11,10 @@ def visualize(metadata: dict):
 
     # Draw bounding boxes
     for obj in metadata.get('obj_loc', []):
-        score = obj.get('score', None)
-        if score < 0.5:
-            continue
         x, y, w, h = obj['x'], obj['y'], obj['width'], obj['height']
         class_name = obj.get('objectName', '')
         label = f"{class_name}"
+        score = obj.get('score', None)
         if score is not None:
             label += f" ({score:.2f})"
         # Rectangle: (x, y), width, height

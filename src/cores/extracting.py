@@ -223,6 +223,8 @@ class FeatureExtractor:
             for preds in all_predictions:
                 object_list = []
                 for box, label, score in zip(*preds.values()):
+                    if score < 0.4:
+                        continue
                     x1, y1, x2, y2 = box.tolist()
                     object_list.append({
                         'x': x1,
@@ -234,7 +236,7 @@ class FeatureExtractor:
                     })
 
                 all_object_infos.append(object_list)
-                all_paths.extend(paths)
+            all_paths.extend(paths)
 
             progress_bar.update(batch.size(0))
 
@@ -243,7 +245,7 @@ class FeatureExtractor:
 
     @torch.no_grad()
     def extract_shot_action(self,
-                            batch_size=8,
+                            batch_size=2,
                             num_workers=4) -> tuple[list[str], list[str]]:
         """Extract the action in the shots."""
         weights = S3D_Weights.DEFAULT
