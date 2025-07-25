@@ -1,6 +1,6 @@
 import os
 from shutil import rmtree
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import cv2
@@ -15,6 +15,7 @@ class FrameSampler:
         self.video_dir = video_dir
         self.output_dir = output_dir
         self.num_workers = num_workers
+        self.model = TransNetV2()
 
     def extract_shot_frames(self, video_path: str, shots: np.ndarray):
         """Extract keyframes from detected shots."""
@@ -54,7 +55,6 @@ class FrameSampler:
         file_path = os.path.join(self.video_dir, video_file)
 
         # Predict shots
-        model = TransNetV2()
         _, preds, _ = model.predict_video(file_path)
         shots = model.predictions_to_scenes(preds)
 
@@ -81,7 +81,7 @@ class FrameSampler:
 
         files = os.listdir(self.video_dir)
         shot_infos = []
-        with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
+        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
             desc = 'Sampling keyframes'
             results = tqdm(executor.map(self.process_video, files), desc, len(files))
             for result in results:
