@@ -1,5 +1,6 @@
 import logging
 import json
+import time
 
 import numpy as np
 import torch
@@ -83,21 +84,19 @@ class Retriever:
 
         # Search index
         k = min(k, self.index.ntotal)
+        start = time.time()
         distances, indices = self.index.search(query_features.reshape(1, -1), k)
+        search_time = time.time() - start
 
         # Prepare results
         results = []
         for dist, idx in zip(distances[0], indices[0]):
             results.append((self.metadata[idx], float(dist)))
-            logger.info(f"Match found: {self.metadata[idx]['path']} with distance {dist:.3f}")
-
-        # Sort results by distance (smaller is better)
-        results.sort(key=lambda x: x[1])
 
         if not results:
             logger.warning("No matches found!")
         else:
-            logger.info(f"Found {len(results)} matches")
+            logger.info(f"Found {len(results)} matches in {search_time} second(s).")
 
         return results
 

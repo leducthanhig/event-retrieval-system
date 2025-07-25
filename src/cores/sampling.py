@@ -8,6 +8,7 @@ import cv2
 import pandas as pd
 from tqdm import tqdm
 
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' # to disable the warning message
 from transnetv2 import TransNetV2
 
 class FrameSampler:
