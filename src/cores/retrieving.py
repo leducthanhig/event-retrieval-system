@@ -76,7 +76,7 @@ class Retriever:
         features = features.cpu().numpy()
         return self.search(features, k)
 
-    def search(self, query_features: np.ndarray, k=10) -> list[tuple[str, float]]:
+    def search(self, query_features: np.ndarray, k=10) -> list[tuple[dict, float]]:
         """Search for similar images."""
         if not self.index.is_trained:
             raise RuntimeError("Index has not been trained. Add images first.")
@@ -88,7 +88,7 @@ class Retriever:
         # Prepare results
         results = []
         for dist, idx in zip(distances[0], indices[0]):
-            results.append((self.metadata[idx]['path'], float(dist)))
+            results.append((self.metadata[idx], float(dist)))
             logger.info(f"Match found: {self.metadata[idx]['path']} with distance {dist:.3f}")
 
         # Sort results by distance (smaller is better)
