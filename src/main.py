@@ -15,7 +15,7 @@ from configs import (
 )
 
 if __name__ == '__main__':
-    sampler = FrameSampler(VIDEO_DIR, FRAME_DIR)
+    sampler = FrameSampler(VIDEO_DIR, FRAME_DIR, batch_size=16)
     shot_infos = sampler.run()
 
     shot_infos.to_json(SHOT_INFOS_PATH, 'records', indent=2)
