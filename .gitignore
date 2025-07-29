@@ -1,2 +1,4 @@
 data/*/
 __pycache__/
+elastic-start-local/
+node_modules/

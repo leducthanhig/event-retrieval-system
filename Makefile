@@ -5,7 +5,7 @@ setup:
 		--index-url https://download.pytorch.org/whl/cu118
 	pip install 'numpy<2' matplotlib pandas tensorflow opencv-python \
 		ffmpeg-python pillow ftfy regex tqdm elasticsearch fastapi \
-		open_clip
+		open_clip_torch
 
 # 	install transnetv2 and download weights files manually due to git lfs issues
 	GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/soCzech/TransNetV2.git
@@ -21,6 +21,9 @@ setup:
 #	micromamba install -c pytorch -c nvidia faiss-gpu
 #	micromamba install -c pytorch -c nvidia -c rapidsai -c conda-forge \
 		libnvjitlink faiss-gpu-cuvs
+
+elastic-start-local:
+	curl -fsSL https://elastic.co/start-local | sh
 
 # run this if ffmpeg binaries is not installed yet
 ffmpeg:
