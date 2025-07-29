@@ -9,7 +9,7 @@ setup:
 
 # 	install transnetv2 and download weights files manually due to git lfs issues
 	GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/soCzech/TransNetV2.git
-	python download-weights.py
+	python backend/download-weights.py
 
 # 	install cpu version of faiss on windows
 	micromamba install -c pytorch faiss-cpu
