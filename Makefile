@@ -4,8 +4,8 @@ setup:
 	pip install torch torchvision torchaudio \
 		--index-url https://download.pytorch.org/whl/cu118
 	pip install 'numpy<2' matplotlib pandas tensorflow opencv-python \
-		ffmpeg-python pillow ftfy regex tqdm elasticsearch fastapi
-	pip install git+https://github.com/openai/CLIP.git
+		ffmpeg-python pillow ftfy regex tqdm elasticsearch fastapi \
+		open_clip
 
 # 	install transnetv2 and download weights files manually due to git lfs issues
 	GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/soCzech/TransNetV2.git
