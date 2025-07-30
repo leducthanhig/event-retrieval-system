@@ -3,19 +3,16 @@ import logging
 import pickle
 import json
 
-from cores.sampling import FrameSampler
-from cores.extracting import FeatureExtractor
-from cores.retrieving import Retriever
-from cores.models import VideoModel
+from cores.indexing import VectorIndexer, TextIndexer
+from cores.utils import encode_object
 
 from configs import (
-    INP_VIDEO_DIR,
-    OUT_FRAME_DIR,
-    VIDEO_DATA_PATH,
-    SHOT_DATA_PATH,
-    FEATURES_PATH,
-    METADATA_PATH,
-    INDEX_DATA_PATH
+    VECTOR_DATA,
+    OBJECT_DATA,
+    FAISS_PRESET,
+    FAISS_SAVE_PATH,
+    ELASTIC_HOST,
+    ELASTIC_INDEX_NAME
 )
 
 # Configure logging
@@ -25,41 +22,28 @@ logging.basicConfig(
 )
 
 if __name__ == '__main__':
-    # Create video data
-    video_data: list[VideoModel] = [{
-        'id': os.path.splitext(filename)[0],
-        'path': os.path.join(dirname, filename)
+    # Load data from disk
+    with open(VECTOR_DATA, 'rb') as f:
+        vector_data = pickle.load(f)
+
+    with open(OBJECT_DATA, 'r') as f:
+        object_data = json.load(f)
+
+    # Index features
+    vec_indexer = VectorIndexer(FAISS_PRESET)
+    vec_indexer.create_index(vector_data['all_vectors'], FAISS_SAVE_PATH)
+
+    docs = [{
+        'objects': ' '.join([obj['label'] for obj in objects]),
+        'locations': ' '.join([encode_object(obj) for obj in objects]),
+        'path': path
+    } for path, objects in zip(object_data['paths'], object_data['all_objects'])]
+    mapping = {
+        'properties': {
+            'objects': {'type': 'text'},
+            'locations': {'type': 'text'},
+            'path': {'type': 'keyword'}
+        }
     }
-    for dirname, _, filenames in os.walk(INP_VIDEO_DIR)
-    for filename in filenames]
-
-    # Save video data to disk
-    with open(VIDEO_DATA_PATH, 'w') as f:
-        json.dump(video_data, f, indent=2)
-
-    # Sample frames
-    sampler = FrameSampler(video_data, OUT_FRAME_DIR)
-    shot_data, frame_data = sampler.run()
-
-    # Save shot and frame data to disk
-    with open(SHOT_DATA_PATH, 'w') as f:
-        json.dump(shot_data, f, indent=2)
-    with open(METADATA_PATH, 'w') as f:
-        json.dump(frame_data, f, indent=2)
-
-    # Extract features
-    extractor = FeatureExtractor(frame_data)
-    all_features, metadata = extractor.run()
-
-    # Save the extracted feature vectors and metadata to disk
-    with open(FEATURES_PATH, 'wb') as f:
-        pickle.dump(all_features, f)
-    with open(METADATA_PATH, 'w') as f:
-        json.dump(metadata, f, indent=2)
-
-    # Index all feature vector
-    retriever = Retriever()
-    retriever.create_index(all_features, metadata)
-
-    # Save index data and metadata to disk
-    retriever.save(INDEX_DATA_PATH, METADATA_PATH)
+    es_indexer = TextIndexer(ELASTIC_HOST, api_key=os.environ['ES_LOCAL_API_KEY'])
+    es_indexer.create_index(ELASTIC_INDEX_NAME, docs, mapping)
