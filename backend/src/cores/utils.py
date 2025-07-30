@@ -1,9 +1,8 @@
+import math
 import ffmpeg
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from PIL import Image
-
-from cores.models import FrameModel
 
 def get_nvidia_decoder(codec_name: str):
     """Return the NVIDIA decoder name for a given codec."""
@@ -22,7 +21,7 @@ def get_video_codec(video_file: str) -> str:
             return stream['codec_name']
     raise RuntimeError("No video stream found")
 
-def visualize(metadata: FrameModel, object_conf_thresh: float = None):
+def visualize(metadata: dict, object_conf_thresh: float = None):
     """Visualize an image with bounding boxes and labels."""
     path = metadata['path']
     print('Visualizing image', path)
@@ -41,8 +40,43 @@ def visualize(metadata: FrameModel, object_conf_thresh: float = None):
         xmin, ymin, xmax, ymax = obj['xmin'], obj['ymin'], obj['xmax'], obj['ymax']
         label = f"{obj['label']} ({score:.2f})"
 
-        rect = patches.Rectangle((xmin, ymin), xmax, ymax, linewidth=2, edgecolor='r', facecolor='none')
+        width = xmax - xmin
+        height = ymax - ymin
+        rect = patches.Rectangle((xmin, ymin), width, height, linewidth=2, edgecolor='r', facecolor='none')
         ax.add_patch(rect)
         ax.text(xmin, ymin - 5, label, color='white', fontsize=10, bbox=dict(facecolor='red', alpha=0.5, pad=1))
 
     plt.show()
+
+def encode_object(object_info: dict, src_size=(1280, 720), dst_size=(16, 9)):
+    """Convert object bounding boxes to textual description."""
+    fx = dst_size[0] / src_size[0]
+    fy = dst_size[1] / src_size[1]
+
+    texts = []
+    label = object_info['label']
+
+    xmin = int(object_info['xmin'] * fx)
+    xmax = int(object_info['xmax'] * fx)
+    ymin = int(object_info['ymin'] * fy)
+    ymax = int(object_info['ymax'] * fy)
+
+    for i in range(ymin, ymax + 1):
+        for j in range(xmin, xmax + 1):
+            texts.append(f"{i}{chr(j + ord('a'))}{label}")
+
+    return ' '.join(texts)
+
+def normalize_cosine_distance(distance: float):
+    """Normalize Consine distance."""
+    return 1 - distance / 2
+
+def normalize_bm25_score(bm25_score: float, k=1.2):
+    """
+    Normalize BM25 score.
+
+    Args:
+        bm25_score: Raw BM25 scores
+        k: Sigmoid steepness
+    """
+    return 1 / (1 + math.exp(-k * bm25_score))

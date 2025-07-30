@@ -1,11 +1,14 @@
-INP_VIDEO_DIR = 'data\\videos'
-OUT_FRAME_DIR = 'data\\keyframes'
+INP_VIDEO_DIR = 'data/videos'
+OUT_FRAME_DIR = 'data/keyframes'
 
-VIDEO_DATA_PATH = 'data\\videos.json'
-SHOT_DATA_PATH = 'data\\shots.json'
-FEATURES_PATH = 'data\\features.pkl'
-METADATA_PATH = 'data\\metadata.json'
-INDEX_DATA_PATH = 'data\\index.bin'
+CLIP_MODEL = 'ViT-L-14-quickgelu'
+CLIP_PRETRAINED = 'dfn2b'
 
-CLIP_MODEL = 'EVA02-L-14-336'
-CLIP_WEIGHTS = 'merged2b_s6b_b61k'
+VECTOR_DATA = 'data/vectors.pkl'
+OBJECT_DATA = 'data/objects.json'
+
+FAISS_PRESET = 'high_accuracy'
+FAISS_SAVE_PATH = 'data/index.bin'
+
+ELASTIC_HOST = 'http://localhost:9200/'
+ELASTIC_INDEX_NAME = 'my-index'

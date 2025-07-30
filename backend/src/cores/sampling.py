@@ -10,132 +10,103 @@ from tqdm import tqdm
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' # to disable the warning message
 from transnetv2 import TransNetV2
 
-from cores.models import VideoModel, ShotModel, FrameModel
 from cores.utils import get_nvidia_decoder, get_video_codec
 
 logger = logging.getLogger(__name__)
 
 class FrameSampler:
     def __init__(self,
-                 video_data: list[VideoModel],
-                 output_dir: str,
+                 video_root_dir: str,
+                 output_root_dir: str,
                  batch_size=8,
                  num_workers=4,
                  use_gpu=True):
-        self.video_data = video_data
-        self.output_dir = output_dir
+        self.video_root_dir = video_root_dir
+        self.output_root_dir = output_root_dir
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.use_gpu = use_gpu
+
+        self.video_paths = [os.path.join(dirpath, filename)
+                            for dirpath, _, filenames in os.walk(video_root_dir)
+                            for filename in filenames]
+
         self.model = TransNetV2()
 
-    def detect_shots(self, video: VideoModel):
-        video_path = video['path']
-
-        # Predict shots
-        preds, _ = self.predict_video(video_path)
-        if preds is None:
-            logger.warning(f"Skipping {video_path} due to decoding error.")
-            return
-
-        predicted_shots = self.model.predictions_to_scenes(preds)
-
-        # Construct shots' info
-        video_id = video['id'].split('_')[-1]
-        shots: list[ShotModel] = [{
-            'id': f'{video_id}_S{idx:05d}',
-            'start': int(start),
-            'end': int(end),
-            'videoId': video_id
-        } for idx, (start, end) in enumerate(predicted_shots)]
-
-        return shots
-
-    def extract_frames(self, video: VideoModel, shots: list[ShotModel]) -> list[FrameModel]:
+    def extract_frames(self, video_path: str, shots: np.ndarray):
         """Extract keyframes from detected shots."""
-        frame_dir = os.path.join(self.output_dir, video['id'])
-        try:
-            os.mkdir(frame_dir)
-
-        except Exception as e:
-            logger.error(f"Failed to create directory {frame_dir}: {e}")
-            return
+        video_base_dir = os.path.dirname(video_path).removeprefix(self.video_root_dir)
+        video_id = os.path.splitext(os.path.basename(video_path))[0]
+        shot_root_dir = os.path.join(self.output_root_dir, video_base_dir, video_id)
+        os.makedirs(shot_root_dir)
 
         # Create extracting positions: start, 1/3, 2/3, and end indices
-        shot_ids = []
-        all_positions = []
-        for shot in shots:
-            start = shot['start']
-            end = shot['end']
-
-            shot_ids.append(shot['id'].split('_')[-1])
-            all_positions.append([
+        all_positions = [
+            [
                 start,
                 int(start + (end - start) * 1/3),
                 int(start + (end - start) * 2/3),
                 end
-            ])
+            ] for start, end in shots]
 
-        # Flatten and sort unique positions for efficient sequential reading
-        unique_positions = np.unique(all_positions)
-        next_pos_idx = 0
-
-        all_frame_info = []
-        video_path = video['path']
+        # Save frames for each shot and position
         cap = cv2.VideoCapture(video_path)
         try:
             if not cap.isOpened():
                 logger.error(f'Failed to open video file {video_path}')
                 return
 
+            total_frames = 0
             frame_idx = 0
-            saved_frames = {}
-            while next_pos_idx < len(unique_positions):
-                ret, frame = cap.read()
-                if not ret:
-                    logger.warning(f'Failed to read frame at {frame_idx} in {video_path}')
-                    frame_idx += 1
-                    continue
+            for shot_idx, positions in enumerate(all_positions):
+                shot_id = f"S{shot_idx:05}"
+                frame_dir = os.path.join(shot_root_dir, shot_id)
+                os.mkdir(frame_dir)
 
-                if frame_idx == unique_positions[next_pos_idx]:
-                    saved_frames[frame_idx] = frame
-                    next_pos_idx += 1
+                next_pos_idx = 0
+                while next_pos_idx < len(positions):
+                    ret, frame = cap.read()
+                    if not ret:
+                        logger.warning(f'Failed to read frame at {frame_idx} in {video_path}')
+                        frame_idx += 1
+                        continue
 
-                frame_idx += 1
-
-            # Save frames for each shot and position
-            for shot_id, positions in zip(shot_ids, all_positions):
-                shot_frames: list[FrameModel] = []
-                for pos in positions:
-                    frame = saved_frames.get(pos)
-                    if frame is not None:
+                    if frame_idx == positions[next_pos_idx]:
                         try:
-                            frame_id = f"{shot_id:05}_F{pos:05}"
+                            frame_id = f"F{frame_idx:06}"
                             frame_path = os.path.join(frame_dir, f"{frame_id}.jpg")
                             cv2.imwrite(frame_path, frame)
 
-                            shot_frames.append({
-                                'id': frame_id,
-                                'shotId': shot_id,
-                                'selected': False,
-                                'path': frame_path
-                            })
-
                         except Exception as e:
-                            logger.error(f"Failed to write frame at {pos} in {video_path}: {e}")
-                    else:
-                        logger.warning(f"Frame at {pos} not found in {video_path}")
+                            logger.error(f"Failed to write frame at {frame_idx} in {video_path}: {e}")
 
-                # Select the two between frames for embedding
-                total_frames = len(shot_frames)
-                shot_frames[(total_frames - 1) // 2]['selected'] = True
-                shot_frames[(total_frames + 1) // 2]['selected'] = True
+                        # Skip duplicated positions
+                        while next_pos_idx < len(positions) and frame_idx == positions[next_pos_idx]:
+                            next_pos_idx += 1
 
-                all_frame_info.extend(shot_frames)
+                    frame_idx += 1
+
+                # Mark the two between frames as selected
+                extracted_frames = [os.path.join(frame_dir, file)
+                                    for file in os.listdir(frame_dir)]
+                num_frames = len(extracted_frames)
+
+                old_path = extracted_frames[(num_frames - 1) // 2]
+                old_name, ext = os.path.splitext(old_path)
+                new_path = old_name + '_selected' + ext
+                os.rename(old_path, new_path)
+
+                old_path = extracted_frames[(num_frames + 1) // 2]
+                old_name, ext = os.path.splitext(old_path)
+                new_path = old_name + '_selected' + ext
+                os.rename(old_path, new_path)
+
+                total_frames += num_frames
+
+            return total_frames
 
         finally:
             cap.release()
-            return all_frame_info
 
     # Modified version of https://github.com/soCzech/TransNetV2/blob/master/inference/transnetv2.py
     def predict_frames(self, frames: np.ndarray):
@@ -216,26 +187,28 @@ class FrameSampler:
 
         return self.predict_frames(frames)
 
-    def run(self) -> tuple[list[ShotModel], list[FrameModel]]:
+    def run(self):
         """Detect shots from a video and extract keyframes."""
-        if os.path.exists(self.output_dir):
-            rmtree(self.output_dir)
-        os.mkdir(self.output_dir)
+        if os.path.exists(self.output_root_dir):
+            rmtree(self.output_root_dir)
+        os.makedirs(self.output_root_dir)
 
-        all_shot_info = []
-        all_frame_info = []
         desc = 'Sampling keyframes'
-        for video in tqdm(self.video_data, desc, len(self.video_data)):
-            shots = self.detect_shots(video)
-            if not shots:
-                continue
+        total_shots = 0
+        total_frames = 0
+        for video_path in tqdm(self.video_paths, desc, len(self.video_paths)):
+            # Detect shots
+            preds, _ = self.predict_video(video_path)
+            if preds is None:
+                logger.warning(f"Skipping {video_path} due to decoding error.")
+                return
+
+            shots = self.model.predictions_to_scenes(preds)
+            total_shots += len(shots)
 
             # Extract frames from each shot
-            frames = self.extract_frames(video, shots)
+            num_frames = self.extract_frames(video_path, shots)
+            if num_frames:
+                total_frames += num_frames
 
-            all_shot_info.extend(shots)
-            all_frame_info.extend(frames)
-
-        logger.info(f"Successfully extracted {len(all_frame_info)} frames from {len(all_shot_info)} shots")
-
-        return all_shot_info, all_frame_info
+        logger.info(f"Successfully extracted {total_frames} frames from {total_shots} shots")
