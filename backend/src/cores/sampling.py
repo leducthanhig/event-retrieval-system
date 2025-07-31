@@ -89,6 +89,7 @@ class FrameSampler:
                 # Mark the two between frames as selected
                 extracted_frames = [os.path.join(frame_dir, file)
                                     for file in os.listdir(frame_dir)]
+                extracted_frames.sort()
                 num_frames = len(extracted_frames)
 
                 old_path = extracted_frames[(num_frames - 1) // 2]
@@ -158,8 +159,9 @@ class FrameSampler:
                 codec_name = get_video_codec(video_file)
                 nvidia_decoder = get_nvidia_decoder(codec_name)
                 if nvidia_decoder is None:
-                    logger.error(f"Unsupported codec: {codec_name}")
-                    raise RuntimeError(f"Unsupported codec: {codec_name}")
+                    msg = f"Unsupported codec: {codec_name}"
+                    logger.error(msg)
+                    raise RuntimeError(msg)
 
                 video_stream, _ = (
                     ffmpeg
