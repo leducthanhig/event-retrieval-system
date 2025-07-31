@@ -4,7 +4,7 @@ import pickle
 import json
 
 from cores.indexing import VectorIndexer, TextIndexer
-from cores.utils import encode_object
+from cores.utils import encode_object_bboxes
 
 from configs import (
     VECTOR_DATA,
@@ -35,7 +35,7 @@ if __name__ == '__main__':
 
     docs = [{
         'objects': ' '.join([obj['label'] for obj in objects]),
-        'locations': ' '.join([encode_object(obj) for obj in objects]),
+        'locations': ' '.join([encode_object_bboxes(obj) for obj in objects]),
         'path': path
     } for path, objects in zip(object_data['paths'], object_data['all_objects'])]
     mapping = {

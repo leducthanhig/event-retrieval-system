@@ -1,4 +1,3 @@
-import math
 import ffmpeg
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -48,7 +47,7 @@ def visualize(metadata: dict, object_conf_thresh: float = None):
 
     plt.show()
 
-def encode_object(object_info: dict, src_size=(1280, 720), dst_size=(16, 9)):
+def encode_object_bboxes(object_info: dict, src_size=(1280, 720), dst_size=(16, 9)):
     """Convert object bounding boxes to textual description."""
     fx = dst_size[0] / src_size[0]
     fy = dst_size[1] / src_size[1]
@@ -66,17 +65,3 @@ def encode_object(object_info: dict, src_size=(1280, 720), dst_size=(16, 9)):
             texts.append(f"{i}{chr(j + ord('a'))}{label}")
 
     return ' '.join(texts)
-
-def normalize_cosine_distance(distance: float):
-    """Normalize Consine distance."""
-    return 1 - distance / 2
-
-def normalize_bm25_score(bm25_score: float, k=1.2):
-    """
-    Normalize BM25 score.
-
-    Args:
-        bm25_score: Raw BM25 scores
-        k: Sigmoid steepness
-    """
-    return 1 / (1 + math.exp(-k * bm25_score))

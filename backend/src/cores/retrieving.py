@@ -1,119 +1,45 @@
-import logging
-import json
+import os
 import time
-from typing_extensions import Literal
+import logging
+from typing import Literal
+from collections import defaultdict
 
 import numpy as np
 import torch
 import faiss
 from PIL import Image
 from open_clip import create_model_and_transforms, get_tokenizer
+from elasticsearch import Elasticsearch
 
-from cores.models import FrameModel
-from configs import CLIP_MODEL, CLIP_WEIGHTS
+from cores.utils import encode_object_bboxes
 
 logger = logging.getLogger(__name__)
 
-# Source code: https://github.com/bnsreenu/python_for_microscopists/blob/master/350%20-%20Efficient%20Image%20Retrieval%20with%20Vision%20Transformer%20(ViT)%20and%20FAISS/retrieval_system.py
 class Retriever:
-    # Define preset configurations
-    PRESETS = {
-        "high_accuracy": {
-            "index_type": "flat",  # Use flat index for highest accuracy
-            "nprobe": None,        # Not applicable for flat index
-            "n_regions_factor": None,  # Not applicable for flat index
-            "description": "Highest accuracy but slower search speed"
-        },
-        "balanced": {
-            "index_type": "ivf_flat",
-            "nprobe": 10,          # Default value
-            "n_regions_factor": 4,  # Default factor for n_regions calculation
-            "description": "Balance between accuracy and speed"
-        },
-        "high_speed": {
-            "index_type": "ivf_flat",
-            "nprobe": 5,           # Lower nprobe for faster search
-            "n_regions_factor": 8,  # More regions for faster search
-            "description": "Fastest search speed with reduced accuracy"
-        }
-    }
-
     def __init__(self,
-                 index_path: str = None,
-                 metadata_path: str = None,
-                 preset: Literal['high_accuracy', 'balanced', 'high_speed'] = 'balanced',  # Default preset
-                 nprobe: int = None,        # Override preset if provided
-                 clip_model=CLIP_MODEL,
-                 clip_weights=CLIP_WEIGHTS,
+                 vector_index_path: str,
+                 metadata: list[str],
+                 clip_model: str,
+                 clip_weights: str,
+                 elastic_host: str,
+                 elastic_api_key: str,
+                 elastic_index_name: str,
                  device='cuda' if torch.cuda.is_available() else 'cpu'):
-        # Validate preset
-        if preset not in self.PRESETS:
-            raise ValueError(f"Invalid preset '{preset}'. Choose from: {list(self.PRESETS.keys())}")
-
-        self.preset = preset
-        preset_config = self.PRESETS[preset]
-
-        # Use provided nprobe if specified, otherwise use preset value
-        self.nprobe = nprobe if nprobe is not None else preset_config['nprobe']
-        self.index_type = preset_config['index_type']
-        self.n_regions_factor = preset_config['n_regions_factor']
-
+        self.metadata = metadata
+        self.elastic_index_name = elastic_index_name
         self.device = device
-
-        # Log preset info
-        logger.info(f"Using '{preset}' preset: {preset_config['description']}")
-        logger.info(f"Preset configuration: index_type={self.index_type}, nprobe={self.nprobe}")
 
         self.model, _, self.preprocess = create_model_and_transforms(clip_model,
                                                                      clip_weights,
                                                                      device=device)
-        self.tokenizer = get_tokenizer(CLIP_MODEL)
-        self.feature_dim = next(reversed(self.model.state_dict().values())).shape[0]
-        logger.info(f"Initializing retriever with dimension: {self.feature_dim}")
+        self.tokenizer = get_tokenizer(clip_model)
 
-        # Load existing index and metadata if provided
-        if index_path and metadata_path:
-            self.load(index_path, metadata_path)
+        # Load index and metadata
+        self.load(vector_index_path)
 
-    def create_index(self,
-                     all_features: np.ndarray,
-                     metadata: list[FrameModel]):
-        """Index all given feature vectors based on the preset configuration."""
-        num_vectors = len(all_features)
-
-        if self.index_type == 'flat':
-            # For high accuracy, use a flat index (exact search)
-            logger.info("Creating new Flat index for high accuracy")
-            self.index = faiss.IndexFlatL2(self.feature_dim)
-
-            # Flat index doesn't need training
-            self.index.add(all_features)
-            logger.info(f"Total vectors in index: {self.index.ntotal}")
-
-        elif self.index_type == 'ivf_flat':
-            # Calculate n_regions based on number of vectors and preset factor
-            n_regions = min(int(self.n_regions_factor * np.sqrt(num_vectors)), num_vectors // 2)
-
-            # Initialize new FAISS IVF index
-            logger.info(f"Creating new IVF index with {n_regions} regions")
-            self.quantizer = faiss.IndexFlatL2(self.feature_dim)
-            self.index = faiss.IndexIVFFlat(self.quantizer, self.feature_dim,
-                                          n_regions, faiss.METRIC_L2)
-            self.index.nprobe = self.nprobe
-
-            # Train index
-            logger.info("Training IVF index...")
-            self.index.train(all_features)
-            logger.info("Index training completed")
-
-            # Add to index
-            self.index.add(all_features)
-            logger.info(f"Total vectors in index: {self.index.ntotal}")
-
-        # Update metadata
-        self.metadata = metadata
-
-        logger.info(f"Successfully indexed {len(all_features)} vectors")
+        # Connect to Elasticsearch cluster
+        self.client = Elasticsearch(elastic_host, api_key=elastic_api_key)
+        logger.info(f"Sucessfully connected to Elasticsearch cluster at {elastic_host}")
 
     @torch.no_grad()
     def search_by_text(self, text_query: str, k=10):
@@ -122,75 +48,215 @@ class Retriever:
         features = self.model.encode_text(tokenized_text)
         features /= features.norm(dim=-1, keepdim=True)
         features = features.cpu().numpy()
-        return self.search(features, k)
+        return self.semantic_search(features, k)
 
     @torch.no_grad()
     def search_by_image(self, image_query_path: str, k=10):
-        """Search for similar images the image query."""
+        """Search for relevant images the image query."""
         image = Image.open(image_query_path)
         processed_image = self.preprocess(image).unsqueeze(0).to(self.device)
         features = self.model.encode_image(processed_image)
         features /= features.norm(dim=-1, keepdim=True)
         features = features.cpu().numpy()
-        return self.search(features, k)
+        return self.semantic_search(features, k)
 
-    def search(self, query_features: np.ndarray, k=10) -> list[tuple[FrameModel, float]]:
-        """Search for similar images."""
-        # Check if index exists and is initialized
-        if not hasattr(self, 'index'):
-            raise RuntimeError("Index has not been created or loaded.")
-
-        # For IVF indexes, check if trained
-        if hasattr(self.index, 'is_trained') and not self.index.is_trained:
-            raise RuntimeError("Index has not been trained. Add images first.")
+    def semantic_search(self, query_vector: np.ndarray, k=10, nprobe: int = None):
+        """Search for relevant images."""
+        if isinstance(self.vector_index, faiss.IndexIVFFlat):
+            if not nprobe:
+                nprobe = 10
+            self.vector_index.nprobe = nprobe
+            logger.info(f"Set nprobe to {nprobe}")
 
         # Search index
-        k = min(k, self.index.ntotal)
+        k = min(k, self.vector_index.ntotal)
         start = time.time()
-        distances, indices = self.index.search(query_features.reshape(1, -1), k)
+        distances, indices = self.vector_index.search(query_vector.reshape(1, -1), k)
         search_time = time.time() - start
 
         # Prepare results
-        results = []
-        for dist, idx in zip(distances[0], indices[0]):
-            results.append((self.metadata[idx], float(dist)))
-
+        results = [(self.metadata[idx], float(dist))
+                   for dist, idx in zip(distances[0], indices[0])]
         if not results:
             logger.warning("No matches found!")
         else:
             logger.info(f"Found {len(results)} matches in {search_time} second(s).")
 
-        return results
+        # Normalize before returning
+        return Retriever.normalize_consine_distances(results)
 
-    def save(self, index_path: str, metadata_path: str):
-        """Save the index and metadata to disk."""
-        faiss.write_index(self.index, index_path)
+    def search_by_object_counts(self, counts: list[tuple[str, int]], k=10):
+        """Search by the number of instances of each object."""
+        text_query = ' '.join(label
+                              for label, count in counts
+                              for _ in range(count))
+        return self.full_text_search(text_query, 'objects', k)
 
-        with open(metadata_path, 'w') as f:
-            json.dump(self.metadata, f, indent=2)
+    def search_by_object_locations(self, bboxes: list[dict], k=10):
+        """Search by the bounding box location of each object."""
+        text_query = ' '.join([encode_object_bboxes(bbox) for bbox in bboxes])
+        return self.full_text_search(text_query, 'locations', k)
 
-        logger.info(f"Saved index with {self.index.ntotal} vectors")
-        logger.info(f"Saved index to \"{index_path}\" and metadata to \"{metadata_path}\"")
+    def full_text_search(self, text_query: str, search_field: str, k=10):
+        """Search for similar textual encoded attribute."""
+        # Construct the query
+        query = {
+            'query': {
+                'match': {
+                    search_field: {
+                        'query': text_query
+                    }
+                }
+            },
+            '_source': 'path',
+            'size': k
+        }
+        # Run search
+        response = self.client.search(index=self.elastic_index_name, body=query)
 
-    def load(self, index_path: str, metadata_path: str):
+        # Prepare results
+        results = [(doc['_source']['path'], doc['_score'])
+                   for doc in response['hits']['hits']]
+        if not results:
+            logger.warning("No matches found!")
+        else:
+            logger.info(f"Found {len(results)} matches in {response['took'] / 1000} second(s).")
+
+        # Normalize before returning
+        return Retriever.normalize_bm25_scores(results)
+
+    def search(self,
+               text_query: str,
+               object_counts: list[tuple[str, int]] = None,
+               object_bboxes: list[dict] = None,
+               weights: list[float] = None,
+               pooling_method: Literal['avg', 'max'] = 'max',
+               k=10):
+        """Perform multimodal search for all given queries."""
+        # Perform the primary text search
+        all_results = [self.search_by_text(text_query, k)]
+
+        # Perform other searches if provided
+        if object_counts:
+            all_results.append(self.search_by_object_counts(object_counts, k))
+        if object_bboxes:
+            all_results.append(self.search_by_object_locations(object_bboxes, k))
+
+        # Combine results if needed
+        if len(all_results) == 1:
+            final_results = all_results[0]
+        else:
+            final_results = self.combine_modalities_results(all_results, weights)
+
+        # Combine frames and return
+        return self.combine_frames(final_results, pooling_method)
+
+    def load(self, index_path: str):
         """Load the index and metadata from disk."""
         logger.info(f"Loading index from {index_path}")
-        self.index = faiss.read_index(index_path)
+        self.vector_index = faiss.read_index(index_path)
 
-        # Determine index type from loaded index for proper handling
-        if isinstance(self.index, faiss.IndexFlatL2):
-            self.index_type = 'flat'
+        # Determine index type from loaded index
+        if isinstance(self.vector_index, faiss.IndexFlatL2):
             logger.info("Loaded a Flat index")
-        elif isinstance(self.index, faiss.IndexIVFFlat):
-            self.index_type = 'ivf_flat'
-            # Apply preset's nprobe to loaded index
-            self.index.nprobe = self.nprobe
-            logger.info(f"Loaded an IVF index, set nprobe to {self.nprobe}")
+        elif isinstance(self.vector_index, faiss.IndexIVFFlat):
+            logger.info("Loaded an IVF index")
         else:
-            logger.warning(f"Loaded index of unknown type: {type(self.index)}")
+            logger.warning(f"Loaded index of unknown type: {type(self.vector_index)}")
 
-        with open(metadata_path, 'r') as f:
-            self.metadata = json.load(f)
-
-        logger.info(f"Loaded index with {self.index.ntotal} vectors")
+        logger.info(f"Loaded index with {self.vector_index.ntotal} vectors")
         logger.info(f"Metadata contains {len(self.metadata)} entries")
+
+    def combine_modalities_results(self,
+                                   all_modal_results: list[list[tuple[str, float]]],
+                                   weights: list[float]) -> list[tuple[str, float]]:
+        """Combine results from all modalities."""
+        if len(all_modal_results) != len(weights):
+            msg = "Mismatched between the number of modal results and weights"
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        # Convert lists to dictionaries for efficient lookups
+        dicts = [defaultdict(float, results) for results in all_modal_results]
+
+        # Get the union of keys from all dictionaries
+        all_keys = set()
+        for d in dicts:
+            all_keys = all_keys.union(set(d.keys()))
+
+        # Combine results with weighted scores
+        combined_results = [
+            (key, sum([w * d[key] for w, d in zip(weights, dicts)]))
+            for key in all_keys
+        ]
+
+        # Sort results by the combined score in descending order
+        combined_results.sort(key=lambda x: x[1], reverse=True)
+
+        return combined_results
+
+    def combine_frames(self,
+                       results: list[tuple[str, float]],
+                       pooling_method: Literal['avg', 'max'] = 'max') -> list[dict]:
+        """Combine frames in a same shot."""
+        # Get pooling function
+        if pooling_method == 'avg':
+            pooling = np.average
+        elif pooling_method == 'max':
+            pooling = np.amax
+        else:
+            msg = f"Unsupported pooling method: {pooling_method}"
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        # Group frames by video and shot
+        grouped_frames = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        for path, score in results:
+            # path format: /dir/video_id/shot_id/frame_id.ext
+            dirname = os.path.dirname(path)
+            shot_id = os.path.basename(dirname)
+            dirname = os.path.dirname(dirname)
+            video_id = os.path.basename(dirname)
+            grouped_frames[video_id][shot_id]['paths'].append(path)
+            grouped_frames[video_id][shot_id]['scores'].append(score)
+
+        # Combine results with the specified pooling method
+        combined_results = []
+        for video_id in grouped_frames:
+            for shot_id in grouped_frames[video_id]:
+                shot = grouped_frames[video_id][shot_id]
+
+                idx = np.argmax(shot['scores'])
+                thumbnail_path = shot['paths'][idx]
+
+                combined_results.append({
+                    'videoId': video_id,
+                    'shotId': shot_id,
+                    'thumbnail': thumbnail_path,
+                    'score': pooling(shot['scores'])
+                })
+
+        # Sort results by the combined score in descending order
+        combined_results.sort(key=lambda x: x['score'], reverse=True)
+
+        return combined_results
+
+    @staticmethod
+    def normalize_consine_distances(results: list[tuple[str, float]]) -> list[tuple[str, float]]:
+        """Normalize Consine distances from vector search results."""
+        distances = np.array([dis for _, dis in results])
+        dis_min = distances.min()
+        dis_max = distances.max()
+        dis_range = dis_max - dis_min
+        return [(path, 1 - (dis - dis_min) / dis_range)
+                for path, dis in results]
+
+    @staticmethod
+    def normalize_bm25_scores(results: list[tuple[str, float]]) -> list[tuple[str, float]]:
+        """Normalize BM25 scores from full-text search results."""
+        scores = np.array([score for _, score in results])
+        score_min = scores.min()
+        score_max = scores.max()
+        score_range = score_max - score_min
+        return [(path, (score - score_min) / score_range)
+                for path, score in results]
