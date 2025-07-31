@@ -23,7 +23,7 @@ setup:
 		libnvjitlink faiss-gpu-cuvs
 
 elastic-start-local:
-	curl -fsSL https://elastic.co/start-local | sh
+	curl -fsSL https://elastic.co/start-local | sh -s -- --esonly
 
 # run this if ffmpeg binaries is not installed yet
 ffmpeg:
