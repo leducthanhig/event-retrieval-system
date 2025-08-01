@@ -89,17 +89,25 @@ class TextIndexer:
         logger.info(f"Sucessfully connected to Elasticsearch cluster at {host}")
 
     def create_index(self, index_name: str, documents: list[dict], mapping: dict = None):
-        # Create index with optional mapping
+        # Create index (if not exists) with optional mapping
         if not self.client.indices.exists(index=index_name):
-            body = {"mappings": mapping} if mapping else {}
+            body = {'mappings': mapping} if mapping else {}
             self.client.indices.create(index=index_name, body=body)
             logger.info(f"Created index '{index_name}'")
+
+        # Remove all existing documents
+        query = {
+            'query': {
+                'match_all': {}
+            }
+        }
+        self.client.delete_by_query(index=index_name, body=query)
 
         # Prepare actions for bulk insert
         actions = [
             {
-                "_index": index_name,
-                "_source": doc
+                '_index': index_name,
+                '_source': doc
             }
             for doc in documents
         ]
