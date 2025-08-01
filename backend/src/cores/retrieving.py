@@ -11,7 +11,7 @@ from PIL import Image
 from open_clip import create_model_and_transforms, get_tokenizer
 from elasticsearch import Elasticsearch
 
-from cores.utils import encode_object_bboxes
+from ..utils import encode_object_bbox
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ class Retriever:
 
     def search_by_object_locations(self, bboxes: list[dict], k=10):
         """Search by the bounding box location of each object."""
-        text_query = ' '.join([encode_object_bboxes(bbox) for bbox in bboxes])
+        text_query = ' '.join([encode_object_bbox(bbox) for bbox in bboxes])
         return self.full_text_search(text_query, 'locations', k)
 
     def full_text_search(self, text_query: str, search_field: str, k=10):

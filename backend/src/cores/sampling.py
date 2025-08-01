@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 from shutil import rmtree
 
 import ffmpeg
@@ -10,7 +11,7 @@ from tqdm import tqdm
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' # to disable the warning message
 from transnetv2 import TransNetV2
 
-from cores.utils import get_nvidia_decoder, get_video_codec
+from utils import get_nvidia_decoder, get_video_codec
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +19,13 @@ class FrameSampler:
     def __init__(self,
                  video_root_dir: str,
                  output_root_dir: str,
+                 video_metadata_save_path: str,
                  batch_size=8,
                  num_workers=4,
                  use_gpu=True):
         self.video_root_dir = video_root_dir
         self.output_root_dir = output_root_dir
+        self.video_metadata_save_path = video_metadata_save_path
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.use_gpu = use_gpu
@@ -32,6 +35,11 @@ class FrameSampler:
                             for filename in filenames]
 
         self.model = TransNetV2()
+
+        self.metadata = dict()
+        for path in self.video_paths:
+            video_id = os.path.splitext(os.path.basename(path))[0]
+            self.metadata[video_id] = dict(path=path)
 
     def extract_frames(self, video_path: str, shots: np.ndarray):
         """Extract keyframes from detected shots."""
@@ -189,6 +197,10 @@ class FrameSampler:
 
         return self.predict_frames(frames)
 
+    def save_metadata(self):
+        with open(self.video_metadata_save_path, 'w') as f:
+            json.dump(self.metadata, f, indent=2)
+
     def run(self):
         """Detect shots from a video and extract keyframes."""
         if os.path.exists(self.output_root_dir):
@@ -208,9 +220,15 @@ class FrameSampler:
             shots = self.model.predictions_to_scenes(preds)
             total_shots += len(shots)
 
+            # Save start timestamps of each shot to metadata
+            video_id = os.path.splitext(os.path.basename(video_path))[0]
+            self.metadata[video_id]['shots'] = [shot[0] for shot in shots]
+
             # Extract frames from each shot
             num_frames = self.extract_frames(video_path, shots)
             if num_frames:
                 total_frames += num_frames
+
+        self.save_metadata()
 
         logger.info(f"Successfully extracted {total_frames} frames from {total_shots} shots")

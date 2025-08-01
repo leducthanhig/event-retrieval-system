@@ -4,11 +4,11 @@ import pickle
 import json
 
 from cores.indexing import VectorIndexer, TextIndexer
-from cores.utils import encode_object_bboxes
+from utils import encode_object_bbox
 
 from configs import (
-    VECTOR_DATA,
-    OBJECT_DATA,
+    VECTOR_DATA_PATH,
+    OBJECT_DATA_PATH,
     FAISS_PRESET,
     FAISS_SAVE_PATH,
     ELASTIC_HOST,
@@ -23,10 +23,10 @@ logging.basicConfig(
 
 if __name__ == '__main__':
     # Load data from disk
-    with open(VECTOR_DATA, 'rb') as f:
+    with open(VECTOR_DATA_PATH, 'rb') as f:
         vector_data = pickle.load(f)
 
-    with open(OBJECT_DATA, 'r') as f:
+    with open(OBJECT_DATA_PATH, 'r') as f:
         object_data = json.load(f)
 
     # Index features

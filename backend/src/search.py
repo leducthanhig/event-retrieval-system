@@ -8,7 +8,7 @@ from cores.retrieving import Retriever
 from configs import (
     CLIP_MODEL,
     CLIP_PRETRAINED,
-    VECTOR_DATA,
+    VECTOR_DATA_PATH,
     FAISS_SAVE_PATH,
     ELASTIC_HOST,
     ELASTIC_INDEX_NAME
@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 
 if __name__ == '__main__':
-    with open(VECTOR_DATA, 'rb') as f:
+    with open(VECTOR_DATA_PATH, 'rb') as f:
         metadata = pickle.load(f)['paths']
     retriever = Retriever(FAISS_SAVE_PATH,
                         metadata,

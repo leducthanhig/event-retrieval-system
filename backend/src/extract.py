@@ -8,11 +8,12 @@ from cores.extracting import FeatureExtractor
 
 from configs import (
     INP_VIDEO_DIR,
+    VIDEO_METADATA_PATH,
     OUT_FRAME_DIR,
     CLIP_MODEL,
     CLIP_PRETRAINED,
-    VECTOR_DATA,
-    OBJECT_DATA,
+    VECTOR_DATA_PATH,
+    OBJECT_DATA_PATH,
 )
 
 # Configure logging
@@ -23,7 +24,7 @@ logging.basicConfig(
 
 if __name__ == '__main__':
     # Sample frames
-    sampler = FrameSampler(INP_VIDEO_DIR, OUT_FRAME_DIR)
+    sampler = FrameSampler(INP_VIDEO_DIR, OUT_FRAME_DIR, VIDEO_METADATA_PATH)
     sampler.run()
 
     # Extract features
@@ -35,10 +36,10 @@ if __name__ == '__main__':
 
     all_vectors, paths = extractor.extract_spatial_features()
     vector_data = dict(all_vectors=all_vectors, paths=paths)
-    with open(VECTOR_DATA, 'wb') as f:
+    with open(VECTOR_DATA_PATH, 'wb') as f:
         pickle.dump(vector_data, f)
 
     all_objects, paths = extractor.extract_object_features()
     object_data = dict(paths=paths, all_objects=all_objects)
-    with open(OBJECT_DATA, 'w') as f:
+    with open(OBJECT_DATA_PATH, 'w') as f:
         json.dump(object_data, f, indent=2)

@@ -47,8 +47,8 @@ def visualize(metadata: dict, object_conf_thresh: float = None):
 
     plt.show()
 
-def encode_object_bboxes(object_info: dict, src_size=(1280, 720), dst_size=(16, 9)):
-    """Convert object bounding boxes to textual description."""
+def encode_object_bbox(object_info: dict, src_size=(1280, 720), dst_size=(16, 9)):
+    """Convert object bounding box to textual description."""
     fx = dst_size[0] / src_size[0]
     fy = dst_size[1] / src_size[1]
 
