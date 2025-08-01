@@ -33,9 +33,14 @@ if __name__ == '__main__':
     vec_indexer = VectorIndexer(FAISS_PRESET)
     vec_indexer.create_index(vector_data['all_vectors'], FAISS_SAVE_PATH)
 
+    obj_det_tol = 0.75
     docs = [{
-        'objects': ' '.join([obj['label'] for obj in objects]),
-        'locations': ' '.join([encode_object_bboxes(obj) for obj in objects]),
+        'objects': ' '.join([obj['label']
+                             for obj in objects
+                             if obj['score'] >= obj_det_tol]),
+        'locations': ' '.join([encode_object_bbox(obj)
+                               for obj in objects
+                               if obj['score'] >= obj_det_tol]),
         'path': path
     } for path, objects in zip(object_data['paths'], object_data['all_objects'])]
     mapping = {
