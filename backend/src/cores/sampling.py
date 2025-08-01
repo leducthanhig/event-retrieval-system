@@ -21,13 +21,11 @@ class FrameSampler:
                  output_root_dir: str,
                  video_metadata_save_path: str,
                  batch_size=8,
-                 num_workers=4,
                  use_gpu=True):
         self.video_root_dir = video_root_dir
         self.output_root_dir = output_root_dir
         self.video_metadata_save_path = video_metadata_save_path
         self.batch_size = batch_size
-        self.num_workers = num_workers
         self.use_gpu = use_gpu
 
         self.video_paths = [os.path.join(dirpath, filename)
@@ -180,7 +178,7 @@ class FrameSampler:
             else:
                 video_stream, _ = (
                     ffmpeg
-                    .input(video_file, threads=self.num_workers)
+                    .input(video_file)
                     .output("pipe:", format="rawvideo", pix_fmt="rgb24", s="48x27")
                     .run(capture_stdout=True, capture_stderr=True)
                 )
