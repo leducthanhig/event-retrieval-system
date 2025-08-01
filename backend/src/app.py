@@ -7,7 +7,7 @@ import tempfile
 from typing import List, Dict, Literal, Annotated
 
 import ffmpeg
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -108,7 +108,9 @@ async def search(q: str,
     }
 
 @app.get('/videos/{video_id}/{shot_id}')
-def get_shot(video_id: str, shot_id: str):
+def get_shot(video_id: str,
+             shot_id: str,
+             background_tasks: BackgroundTasks) -> FileResponse:
     try:
         video_metadata = metadata[video_id]
     except KeyError:
@@ -128,28 +130,26 @@ def get_shot(video_id: str, shot_id: str):
     start = shots[idx] / fps
     if start < len(shots) - 1:
         end = (shots[idx + 1] - 1) / fps
-        video_stream, _ = (
-            ffmpeg
-            .input(path, ss=start, to=end)
-            .output("pipe:", format="rawvideo", pix_fmt="rgb24")
-            .run(capture_stdout=True, capture_stderr=True)
-        )
     else:
-        video_stream, _ = (
-            ffmpeg
-            .input(path, ss=start)
-            .output("pipe:", format="rawvideo", pix_fmt="rgb24")
-            .run(capture_stdout=True, capture_stderr=True)
-        )
+        end = None  # No end time, process until the end of the video
 
-    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_file.write(video_stream)
+    # Create a temporary file for the output video
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
+        temp_file_path = temp_file.name
 
-    response = FileResponse(temp_file.name)
+    # Use ffmpeg to cut the video and save it in MP4 format
+    _, _ = (
+        ffmpeg
+        .input(path, ss=start, to=end)
+        .output(temp_file_path, vcodec='libx264', acodec='copy')
+        .overwrite_output()
+        .run()
+    )
 
-    # Clean up the temporary file after sending
-    @response.background
-    def cleanup():
-        os.remove(temp_file.name)
+    # Add cleanup task to delete the temporary file after sending
+    background_tasks.add_task(os.remove, temp_file_path)
 
-    return response
+    # Send the temporary file to the client
+    return FileResponse(temp_file_path,
+                        media_type='video/mp4',
+                        filename=f"{video_id}_{shot_id}.mp4")
