@@ -20,6 +20,12 @@ def get_video_codec(video_file: str) -> str:
             return stream['codec_name']
     raise RuntimeError("No video stream found")
 
+def get_avg_fps(video_path: str) -> float:
+    """Get the average frame rate of the video."""
+    probe = ffmpeg.probe(video_path)
+    video_stream = next(s for s in probe['streams'] if s['codec_type'] == 'video')
+    return eval(video_stream['avg_frame_rate'])
+
 def visualize(metadata: dict, object_conf_thresh: float = None):
     """Visualize an image with bounding boxes and labels."""
     path = metadata['path']

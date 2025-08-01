@@ -11,7 +11,7 @@ from PIL import Image
 from open_clip import create_model_and_transforms, get_tokenizer
 from elasticsearch import Elasticsearch
 
-from ..utils import encode_object_bbox
+from utils import encode_object_bbox
 
 logger = logging.getLogger(__name__)
 
@@ -230,8 +230,8 @@ class Retriever:
                 thumbnail_path = shot['paths'][idx]
 
                 combined_results.append({
-                    'videoId': video_id,
-                    'shotId': shot_id,
+                    'video_id': video_id,
+                    'shot_id': shot_id,
                     'thumbnail': thumbnail_path,
                     'score': pooling(shot['scores'])
                 })
