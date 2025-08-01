@@ -22,9 +22,15 @@ setup:
 #	micromamba install -c pytorch -c nvidia -c rapidsai -c conda-forge \
 		libnvjitlink faiss-gpu-cuvs
 
-elastic-start-local:
+install-es:
 	curl -fsSL https://elastic.co/start-local | sh -s -- --esonly
 
+start-es:
+	elastic-start-local/start.sh
+
+stop-es:
+	elastic-start-local/stop.sh
+
 # run this if ffmpeg binaries is not installed yet
-ffmpeg:
+install-ffmpeg:
 	micromamba install ffmpeg
