@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import CanvasBox from './CanvasBox';
+import VideoPlayer from './VideoPlayer';
 import './App.css';
 
 function App() {
@@ -176,25 +177,11 @@ function App() {
 
       {/* Video Player Section */}
       {selected && (
-        <div style={{ marginTop: '2rem' }}>
-          <h2>Video Preview</h2>
-          <p>
-            <strong>Video ID:</strong> {selected.video_id}, <strong>Shot ID:</strong> {selected.shot_id}
-          </p>
-          <video
-            key={`${selected.video_id}_${selected.shot_id}`}
-            width="640"
-            height="360"
-            controls
-            autoPlay
-          >
-            <source
-              src={`http://localhost:8000/videos/${selected.video_id}/${selected.shot_id}`}
-              type="video/mp4"
-            />
-            Your browser does not support the video tag.
-          </video>
-        </div>
+        <VideoPlayer
+          videoID={selected.video_id}
+          shotID={selected.shot_id}
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   );
