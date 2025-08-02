@@ -143,9 +143,10 @@ def get_shot_timestamps(video_id: str, shot_id: str) -> FileResponse:
         logger.error(msg)
         raise RuntimeError(msg)
 
-    path = video_metadata['path'].replace(INP_VIDEO_DIR, STATIC_VIDEO_PATH)
-    fps = get_avg_fps(path)
+    abs_path = video_metadata['path']
+    fps = get_avg_fps(abs_path)
     start = shots[idx] / fps
     end = None if idx == len(shots) - 1 else (shots[idx + 1] - 1) / fps
+    public_path = abs_path.replace(INP_VIDEO_DIR, STATIC_VIDEO_PATH)
 
-    return ShotResponse(video_path=path, start=start, end=end)
+    return ShotResponse(video_path=public_path, start=start, end=end)
