@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CanvasBox from './CanvasBox';
 import './App.css';
 
@@ -9,33 +9,54 @@ function App() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selected, setSelected] = useState(null);
   const [boxes, setBoxes] = useState([]);
+  const [objectLabels, setObjectLabels] = useState([]);
 
+  // Load object labels from JSON file
+  useEffect(() => {
+  fetch('/obj_name.json')
+    .then(res => res.json())
+    .then(data => setObjectLabels(data))
+    .catch(err => console.error("Failed to load object labels:", err));
+  }, []);
+
+  // Callback when a new box is drawn on canvas
   const handleBoxDrawn = (box) => {
-    setBoxes([box]); // hoặc push thêm nếu cần lưu nhiều box
+    setBoxes(prev => [...prev, box]);
   };
 
-
+  // Handle search action
   const handleSearch = async () => {
     setError('');
     setHasSearched(true);
+
     try {
-      const response = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(query)}`, {
+      // Prepare request body according to backend schema
+      const body = {
+        bboxes: boxes.map(b => ({
+          label: b.objectName,
+          xmin: b.x,
+          ymin: b.y,
+          xmax: b.x + b.width,
+          ymax: b.y + b.height
+        })),
+        weights: [1.0, 0.0],
+        pooling_method: 'max'
+      };
+
+      const response = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(query)}&top=10`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          "obj-loc": boxes
-        })
+        body: JSON.stringify(body)
       });
 
-
-      if (!response.ok) throw new Error('Failed to fetch');
+      if (!response.ok) throw new Error(`Failed to fetch (${response.status})`);
       const data = await response.json();
       setResults(data.results || []);
     } catch (err) {
-      console.error(err);
-      setError('Error calling API');
+      console.error('Search error:', err);
+      setError('Error calling API: ' + err.message);
     }
   };
 
@@ -43,7 +64,7 @@ function App() {
     <div style={{ padding: '1rem', fontFamily: 'sans-serif' }}>
       <h1>News Event Search</h1>
 
-      {/* Text query input */}
+      {/* Text query input and Search button */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem' }}>
         <input
           type="text"
@@ -55,29 +76,23 @@ function App() {
           }}
           style={{ width: '60%', maxWidth: '480px', padding: '0.5rem', fontSize: '1rem' }}
         />
-
-      <button
-        style={{ padding: '0.5rem 1rem' }}
-        onClick={handleSearch}
-      >
-        Search
-      </button>
-    </div>
-
-      {/* Debug: Hiển thị bounding box đã vẽ */}
-      {boxes.length > 0 && (
-        <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#555' }}>
-          Bounding box: {boxes[0].objectName} at ({boxes[0].x}, {boxes[0].y}) size {boxes[0].width}x{boxes[0].height}
-        </div>
-      )}
-
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem' }}>
-        <CanvasBox onBoxDrawn={handleBoxDrawn} />
+        <button
+          style={{ padding: '0.5rem 1rem' }}
+          onClick={handleSearch}
+        >
+          Search
+        </button>
       </div>
 
-      {/* Search Results area */}
+      {/* Display error message if any */}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+
+      {/* Canvas for drawing bounding boxes */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem' }}>
+        <CanvasBox onBoxDrawn={handleBoxDrawn} objectLabels={objectLabels} />
+      </div>
+
+      {/* Search Results Section */}
       {hasSearched && (
         <div style={{ marginTop: '2rem' }}>
           <h2>Search Results</h2>
@@ -88,27 +103,34 @@ function App() {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(6, 1fr)',
-                gap: '1rem',
+                gap: '0.5rem',
               }}
             >
               {results.map((item, idx) => (
                 <div
                   key={idx}
                   style={{
+                    height: '145px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
                     border: '1px solid #ccc',
-                    padding: '0.5rem',
+                    padding: '0.1rem',
                     borderRadius: '8px',
                     textAlign: 'center',
                     position: 'relative',
                   }}
                 >
                   <img
-                    src={`http://localhost:8000/${item.thumbnail}`} // http://localhost:8000
+                    src={`http://localhost:8000/${item.thumbnail}`}
                     alt="Thumbnail"
                     style={{
                       width: '100%',
+                      height: 'auto',
+                      maxHeight: '120px',
                       cursor: 'pointer',
                       borderRadius: '4px',
+                      objectFit: 'cover'
                     }}
                     onClick={() => setSelected(item)}
                   />
@@ -116,12 +138,34 @@ function App() {
                     style={{
                       display: 'flex',
                       justifyContent: 'center',
-                      marginTop: '0.5rem',
-                      gap: '1rem',
+                      marginTop: '0rem',
+                      gap: '0.7rem',
                     }}
                   >
-                    <button onClick={() => setSelected(item)} title="View Video">📺</button>
-                    <button onClick={() => alert(JSON.stringify(item, null, 2))} title="Details">ℹ️</button>
+                    <button
+                      onClick={() => setSelected(item)}
+                      title="View Video"
+                      style={{
+                        fontSize: '0.9rem',
+                        borderRadius: '4px',
+                        background: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      📺
+                    </button>
+                    <button
+                      onClick={() => alert(JSON.stringify(item, null, 2))}
+                      title="Details"
+                      style={{
+                        fontSize: '0.9rem',
+                        borderRadius: '4px',
+                        background: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ℹ️
+                    </button>
                   </div>
                 </div>
               ))}
@@ -130,16 +174,22 @@ function App() {
         </div>
       )}
 
-      {/* Video player for selected frame */}
+      {/* Video Player Section */}
       {selected && (
         <div style={{ marginTop: '2rem' }}>
           <h2>Video Preview</h2>
           <p>
-            <strong>Video ID:</strong> {selected.videoId}, <strong>Start:</strong> {selected.start}s, <strong>End:</strong> {selected.end}s
+            <strong>Video ID:</strong> {selected.video_id}, <strong>Shot ID:</strong> {selected.shot_id}
           </p>
-          <video width="640" height="360" controls autoPlay>
+          <video
+            key={`${selected.video_id}_${selected.shot_id}`}
+            width="640"
+            height="360"
+            controls
+            autoPlay
+          >
             <source
-              src={`http://localhost:8000/video?id=${selected.videoId}&start=${selected.start}&end=${selected.end}`}
+              src={`http://localhost:8000/videos/${selected.video_id}/${selected.shot_id}`}
               type="video/mp4"
             />
             Your browser does not support the video tag.
