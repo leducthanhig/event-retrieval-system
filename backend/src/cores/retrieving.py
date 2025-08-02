@@ -9,9 +9,6 @@ import torch
 import faiss
 from PIL import Image
 from open_clip import create_model_and_transforms, get_tokenizer
-from elasticsearch import Elasticsearch
-
-from utils import encode_object_bbox
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +18,8 @@ class Retriever:
                  metadata: list[str],
                  clip_model: str,
                  clip_weights: str,
-                 elastic_host: str,
-                 elastic_api_key: str,
-                 elastic_index_name: str,
                  device='cuda' if torch.cuda.is_available() else 'cpu'):
         self.metadata = metadata
-        self.elastic_index_name = elastic_index_name
         self.device = device
 
         self.model, _, self.preprocess = create_model_and_transforms(clip_model,
@@ -36,10 +29,6 @@ class Retriever:
 
         # Load index and metadata
         self.load(vector_index_path)
-
-        # Connect to Elasticsearch cluster
-        self.client = Elasticsearch(elastic_host, api_key=elastic_api_key)
-        logger.info(f"Sucessfully connected to Elasticsearch cluster at {elastic_host}")
 
     @torch.no_grad()
     def search_by_text(self, text_query: str, k=10):
@@ -85,50 +74,9 @@ class Retriever:
         # Normalize before returning
         return Retriever.normalize_consine_distances(results)
 
-    def search_by_object_counts(self, counts: list[tuple[str, int]], k=10):
-        """Search by the number of instances of each object."""
-        text_query = ' '.join(label
-                              for label, count in counts
-                              for _ in range(count))
-        return self.full_text_search(text_query, 'objects', k)
-
-    def search_by_object_locations(self, bboxes: list[dict], k=10):
-        """Search by the bounding box location of each object."""
-        text_query = ' '.join([encode_object_bbox(bbox) for bbox in bboxes])
-        return self.full_text_search(text_query, 'locations', k)
-
-    def full_text_search(self, text_query: str, search_field: str, k=10):
-        """Search for similar textual encoded attribute."""
-        # Construct the query
-        query = {
-            'query': {
-                'match': {
-                    search_field: {
-                        'query': text_query
-                    }
-                }
-            },
-            '_source': 'path',
-            'size': k
-        }
-        # Run search
-        response = self.client.search(index=self.elastic_index_name, body=query)
-
-        # Prepare results
-        results = [(doc['_source']['path'], doc['_score'])
-                   for doc in response['hits']['hits']]
-        if not results:
-            logger.warning("No matches found!")
-        else:
-            logger.info(f"Found {len(results)} matches in {response['took'] / 1000} second(s).")
-
-        # Normalize before returning
-        return Retriever.normalize_bm25_scores(results)
-
     def search(self,
                text_query: str,
-               object_counts: list[tuple[str, int]] = None,
-               object_bboxes: list[dict] = None,
+               image_query_path: str = None,
                weights: list[float] = None,
                pooling_method: Literal['avg', 'max'] = 'max',
                k=10):
@@ -137,10 +85,8 @@ class Retriever:
         all_results = [self.search_by_text(text_query, k)]
 
         # Perform other searches if provided
-        if object_counts:
-            all_results.append(self.search_by_object_counts(object_counts, k))
-        if object_bboxes:
-            all_results.append(self.search_by_object_locations(object_bboxes, k))
+        if image_query_path:
+            all_results.append(self.search_by_image(image_query_path, k))
 
         # Combine results if needed
         if len(all_results) == 1:
@@ -250,13 +196,3 @@ class Retriever:
         dis_range = dis_max - dis_min
         return [(path, 1 - (dis - dis_min) / dis_range)
                 for path, dis in results]
-
-    @staticmethod
-    def normalize_bm25_scores(results: list[tuple[str, float]]) -> list[tuple[str, float]]:
-        """Normalize BM25 scores from full-text search results."""
-        scores = np.array([score for _, score in results])
-        score_min = scores.min()
-        score_max = scores.max()
-        score_range = score_max - score_min
-        return [(path, (score - score_min) / score_range)
-                for path, score in results]

@@ -52,22 +52,3 @@ def visualize(metadata: dict, object_conf_thresh: float = None):
         ax.text(xmin, ymin - 5, label, color='white', fontsize=10, bbox=dict(facecolor='red', alpha=0.5, pad=1))
 
     plt.show()
-
-def encode_object_bbox(object_info: dict, src_size=(1280, 720), dst_size=(16, 9)):
-    """Convert object bounding box to textual description."""
-    fx = dst_size[0] / src_size[0]
-    fy = dst_size[1] / src_size[1]
-
-    texts = []
-    label = object_info['label']
-
-    xmin = int(object_info['xmin'] * fx)
-    xmax = int(object_info['xmax'] * fx)
-    ymin = int(object_info['ymin'] * fy)
-    ymax = int(object_info['ymax'] * fy)
-
-    for i in range(ymin, ymax + 1):
-        for j in range(xmin, xmax + 1):
-            texts.append(f"{i}{chr(j + ord('a'))}{label}")
-
-    return ' '.join(texts)

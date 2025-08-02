@@ -1,4 +1,3 @@
-import os
 import time
 import logging
 import json
@@ -21,8 +20,6 @@ from configs import (
     CLIP_PRETRAINED,
     VECTOR_DATA_PATH,
     FAISS_SAVE_PATH,
-    ELASTIC_HOST,
-    ELASTIC_INDEX_NAME
 )
 
 STATIC_IMAGE_PATH = 'images'
@@ -38,13 +35,7 @@ def init_retriever():
     with open(VECTOR_DATA_PATH, 'rb') as f:
         metadata = pickle.load(f)['paths']
 
-    return Retriever(FAISS_SAVE_PATH,
-                     metadata,
-                     CLIP_MODEL,
-                     CLIP_PRETRAINED,
-                     ELASTIC_HOST,
-                     os.environ['ES_LOCAL_API_KEY'],
-                     ELASTIC_INDEX_NAME)
+    return Retriever(FAISS_SAVE_PATH, metadata, CLIP_MODEL, CLIP_PRETRAINED)
 
 def load_metadata() -> Dict[str, Dict[str, str | List]]:
     with open(VIDEO_METADATA_PATH) as f:
@@ -73,17 +64,6 @@ app.mount(f"/{STATIC_VIDEO_PATH}", StaticFiles(directory=INP_VIDEO_DIR), name="v
 retriever = init_retriever()
 metadata = load_metadata()
 
-class ObjectBBox(BaseModel):
-    label: str
-    xmin: float
-    ymin: float
-    xmax: float
-    ymax: float
-
-class ObjectCounting(BaseModel):
-    label: str
-    count: int
-
 class Shot(BaseModel):
     video_id: str
     shot_id: str
@@ -102,21 +82,10 @@ class ShotResponse(BaseModel):
 
 @app.post("/search")
 async def search(q: str,
-                 bboxes: List[ObjectBBox] = None,
-                 counts: List[ObjectCounting] = None,
-                 weights: Annotated[List[float], Body()] = None,
                  pooling_method: Annotated[Literal['avg', 'max'], Body()] = 'max',
                  top: int = 10):
-    bboxes_dict = None
-    if bboxes:
-        bboxes_dict = [bbox.model_dump() for bbox in bboxes]
-
-    counts_tuple = None
-    if counts:
-        counts_tuple = [tuple(count.model_dump().values()) for count in counts]
-
     start = time.time()
-    results = retriever.search(q, counts_tuple, bboxes_dict, weights, pooling_method, top)
+    results = retriever.search(q, pooling_method=pooling_method, top=top)
     took = time.time() - start
 
     for res in results:

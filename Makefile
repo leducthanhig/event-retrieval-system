@@ -4,7 +4,7 @@ setup:
 	pip install torch torchvision torchaudio \
 		--index-url https://download.pytorch.org/whl/cu118
 	pip install 'numpy<2' matplotlib pandas tensorflow opencv-python \
-		ffmpeg-python pillow ftfy regex tqdm elasticsearch 'fastapi[standard]' \
+		ffmpeg-python pillow ftfy regex tqdm 'fastapi[standard]' \
 		open_clip_torch
 
 # 	install transnetv2 and download weights files manually due to git lfs issues
@@ -25,15 +25,6 @@ setup:
 # run this if ffmpeg binaries is not installed yet
 install-ffmpeg:
 	micromamba install ffmpeg
-
-install-es:
-	curl -fsSL https://elastic.co/start-local | sh -s -- --esonly
-
-start-es:
-	elastic-start-local/start.sh
-
-stop-es:
-	elastic-start-local/stop.sh
 
 start-backend:
 	fastapi dev backend/src/app.py

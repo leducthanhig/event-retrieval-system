@@ -5,7 +5,6 @@
 - Node.js
 - npm
 - FFmpeg
-- Docker
 - GNU Make (Optional, for Makefile commands)
 ## Setup
 ### Backend
@@ -14,17 +13,13 @@
 pip install torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu118
 pip install 'numpy<2' matplotlib pandas tensorflow opencv-python \
-    ffmpeg-python pillow ftfy regex tqdm elasticsearch 'fastapi[standard]' \
+    ffmpeg-python pillow ftfy regex tqdm 'fastapi[standard]' \
     open_clip_torch
 
 GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/soCzech/TransNetV2.git
 python backend/download-weights.py
 
 micromamba install -c pytorch faiss-cpu
-```
-- Set up Elasticsearch:
-```bash
-curl -fsSL https://elastic.co/start-local | sh -s -- --esonly
 ```
 ### Frontend
 - Install Node.js dependencies:
@@ -34,16 +29,6 @@ npm install
 ```
 ## Run the application
 ### Backend
-- Start Elasticsearch (if not already running):
-```bash
-elastic-start-local/start.sh
-```
-- Export Elasticsearch local API key:
-```bash
-source elastic-start-local/.env
-export ES_LOCAL_API_KEY
-```
-- Start the FastAPI server:
 ```bash
 fastapi dev backend/src/app.py
 ```
@@ -57,11 +42,11 @@ npm run dev --prefix frontend
 ```bash
 python -m backend.examples.extract
 ```
-- To index feature vectors and object features (requires `ES_LOCAL_API_KEY` environment variable):
+- To index feature vectors:
 ```bash
 python -m backend.examples.index
 ```
-- To perform a search, play with the search parameters in `backend/examples/search.py` and run (requires `ES_LOCAL_API_KEY` environment variable):
+- To perform a search, play with the search parameters in `backend/examples/search.py` and run:
 ```bash
 python -m backend.examples.search
 ```
