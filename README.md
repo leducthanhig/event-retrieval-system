@@ -61,7 +61,7 @@ python -m backend.examples.extract
 ```bash
 python -m backend.examples.index
 ```
-- To perform a search, play with the search parameters in `-m backend.examples.search` and run (requires `ES_LOCAL_API_KEY` environment variable):
+- To perform a search, play with the search parameters in `backend/examples/search.py` and run (requires `ES_LOCAL_API_KEY` environment variable):
 ```bash
 python -m backend.examples.search
 ```
