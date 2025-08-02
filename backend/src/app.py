@@ -10,6 +10,7 @@ import ffmpeg
 from fastapi import FastAPI, Body, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from cores.retrieving import Retriever
@@ -52,10 +53,23 @@ def load_metadata() -> Dict[str, Dict[str, str | List]]:
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-retriever = init_retriever()
-metadata = load_metadata()
+
+origins = [
+    "http://localhost:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.mount("/images", StaticFiles(directory=OUT_FRAME_DIR), name="images")
+
+retriever = init_retriever()
+metadata = load_metadata()
 
 class ObjectBBox(BaseModel):
     label: str
@@ -79,7 +93,7 @@ class SearchResponse(BaseModel):
     found: int
     results: List[Shot]
 
-@app.get("/search")
+@app.post("/search")
 async def search(q: str,
                  bboxes: List[ObjectBBox] = None,
                  counts: List[ObjectCounting] = None,
@@ -125,22 +139,22 @@ def get_shot(video_id: str,
         logger.error(msg)
         raise RuntimeError(msg)
 
-    path = video_metadata['path']
-    fps = get_avg_fps(path)
-    start = shots[idx] / fps
-    if start < len(shots) - 1:
-        end = (shots[idx + 1] - 1) / fps
-    else:
-        end = None  # No end time, process until the end of the video
-
     # Create a temporary file for the output video
     with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
         temp_file_path = temp_file.name
 
     # Use ffmpeg to cut the video and save it in MP4 format
-    _, _ = (
-        ffmpeg
-        .input(path, ss=start, to=end)
+    path = video_metadata['path']
+    fps = get_avg_fps(path)
+    start = shots[idx] / fps
+    if idx < len(shots) - 1:
+        end = (shots[idx + 1] - 1) / fps
+        ffmpeg_cmd = ffmpeg.input(path, ss=start, to=end)
+    else:
+        ffmpeg_cmd = ffmpeg.input(path, ss=start)
+
+    out, err = (
+        ffmpeg_cmd
         .output(temp_file_path, vcodec='libx264', acodec='copy')
         .overwrite_output()
         .run()
