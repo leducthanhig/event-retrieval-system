@@ -17,6 +17,7 @@ from cores.retrieving import Retriever
 from utils import get_avg_fps
 
 from configs import (
+    INP_VIDEO_DIR,
     OUT_FRAME_DIR,
     VIDEO_METADATA_PATH,
     CLIP_MODEL,
@@ -26,6 +27,9 @@ from configs import (
     ELASTIC_HOST,
     ELASTIC_INDEX_NAME
 )
+
+STATIC_IMAGE_PATH = '/images'
+STATIC_VIDEO_PATH = '/videos'
 
 # Configure logging
 logging.basicConfig(
@@ -66,7 +70,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/images", StaticFiles(directory=OUT_FRAME_DIR), name="images")
+app.mount(STATIC_IMAGE_PATH, StaticFiles(directory=OUT_FRAME_DIR), name="images")
+app.mount(STATIC_VIDEO_PATH, StaticFiles(directory=INP_VIDEO_DIR), name="videos")
 
 retriever = init_retriever()
 metadata = load_metadata()
@@ -93,13 +98,18 @@ class SearchResponse(BaseModel):
     found: int
     results: List[Shot]
 
+class ShotResponse(BaseModel):
+    video_path: str
+    start: float
+    end: float
+
 @app.post("/search")
 async def search(q: str,
                  bboxes: List[ObjectBBox] = None,
                  counts: List[ObjectCounting] = None,
-                 weights: Annotated[list[float], Body()] = None,
+                 weights: Annotated[List[float], Body()] = None,
                  pooling_method: Annotated[Literal['avg', 'max'], Body()] = 'max',
-                 top: int = 10) -> SearchResponse:
+                 top: int = 10):
     bboxes_dict = None
     if bboxes:
         bboxes_dict = [bbox.model_dump() for bbox in bboxes]
@@ -113,18 +123,12 @@ async def search(q: str,
     took = time.time() - start
 
     for res in results:
-        res['thumbnail'] = res['thumbnail'].replace(OUT_FRAME_DIR, 'images')
+        res['thumbnail'] = res['thumbnail'].replace(OUT_FRAME_DIR, STATIC_IMAGE_PATH)
 
-    return {
-        'took': took,
-        'found': len(results),
-        'results': results
-    }
+    return SearchResponse(took=took, found=len(results), results=results)
 
-@app.get('/videos/{video_id}/{shot_id}')
-def get_shot(video_id: str,
-             shot_id: str,
-             background_tasks: BackgroundTasks) -> FileResponse:
+@app.get('/shots/{video_id}/{shot_id}')
+def get_shot_timestamps(video_id: str, shot_id: str) -> FileResponse:
     try:
         video_metadata = metadata[video_id]
     except KeyError:
@@ -139,31 +143,9 @@ def get_shot(video_id: str,
         logger.error(msg)
         raise RuntimeError(msg)
 
-    # Create a temporary file for the output video
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as temp_file:
-        temp_file_path = temp_file.name
-
-    # Use ffmpeg to cut the video and save it in MP4 format
-    path = video_metadata['path']
+    path = video_metadata['path'].replace(INP_VIDEO_DIR, STATIC_VIDEO_PATH)
     fps = get_avg_fps(path)
     start = shots[idx] / fps
-    if idx < len(shots) - 1:
-        end = (shots[idx + 1] - 1) / fps
-        ffmpeg_cmd = ffmpeg.input(path, ss=start, to=end)
-    else:
-        ffmpeg_cmd = ffmpeg.input(path, ss=start)
+    end = None if idx == len(shots) - 1 else (shots[idx + 1] - 1) / fps
 
-    out, err = (
-        ffmpeg_cmd
-        .output(temp_file_path, vcodec='libx264', acodec='copy')
-        .overwrite_output()
-        .run()
-    )
-
-    # Add cleanup task to delete the temporary file after sending
-    background_tasks.add_task(os.remove, temp_file_path)
-
-    # Send the temporary file to the client
-    return FileResponse(temp_file_path,
-                        media_type='video/mp4',
-                        filename=f"{video_id}_{shot_id}.mp4")
+    return ShotResponse(video_path=path, start=start, end=end)
