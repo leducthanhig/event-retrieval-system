@@ -40,13 +40,9 @@ npm run dev --prefix frontend
 - To configure the application, edit the `backend/src/config.py` file.
 - To extract video frames:
 ```bash
-python -m backend.examples.extract
+python backend/src/extract.py
 ```
 - To index feature vectors:
 ```bash
-python -m backend.examples.index
-```
-- To perform a search, play with the search parameters in `backend/examples/search.py` and run:
-```bash
-python -m backend.examples.search
+python backend/src/index.py
 ```
