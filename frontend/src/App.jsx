@@ -41,7 +41,7 @@ function App() {
       <h1 style={{ marginBottom: '3rem' }}>News Event Search</h1>
 
       {/* Text query input and Search button */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '15rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
         <input
           type="text"
           placeholder="Enter your query..."
@@ -50,7 +50,7 @@ function App() {
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleSearch();
           }}
-          style={{ width: '60%', maxWidth: '480px', padding: '0.5rem', fontSize: '1rem' }}
+          style={{ width: '400px', maxWidth: '480px', padding: '0.5rem', fontSize: '1rem' }}
         />
         <button
           style={{ padding: '0.5rem 1rem' }}
@@ -65,7 +65,7 @@ function App() {
 
       {/* Search Results Section */}
       {hasSearched && (
-        <div style={{ marginTop: '2rem' }}>
+        <div style={{ marginTop: '0.5rem' }}>
           <h2>Search Results</h2>
           {results.length === 0 ? (
             <p>No results found.</p>
