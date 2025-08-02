@@ -17,11 +17,10 @@ function App() {
     try {
       // Prepare request body according to backend schema
       const body = {
-        weights: [1.0, 0.0],
         pooling_method: 'max'
       };
 
-      const response = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(query)}&top=10`, {
+      const response = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(query)}&top=100`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body)

@@ -82,10 +82,10 @@ class ShotResponse(BaseModel):
 
 @app.post("/search")
 async def search(q: str,
-                 pooling_method: Annotated[Literal['avg', 'max'], Body()] = 'max',
+                 pooling_method: Annotated[Literal['avg', 'max'], Body(embed=True)] = 'max',
                  top: int = 10):
     start = time.time()
-    results = retriever.search(q, pooling_method=pooling_method, top=top)
+    results = retriever.search(q, pooling_method=pooling_method, k=top)
     took = time.time() - start
 
     for res in results:
