@@ -220,7 +220,7 @@ class FrameSampler:
 
             # Save start timestamps of each shot to metadata
             video_id = os.path.splitext(os.path.basename(video_path))[0]
-            self.metadata[video_id]['shots'] = [shot[0] for shot in shots]
+            self.metadata[video_id]['shots'] = [shot[0] for shot in shots.tolist()]
 
             # Extract frames from each shot
             num_frames = self.extract_frames(video_path, shots)
