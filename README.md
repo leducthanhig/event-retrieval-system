@@ -50,17 +50,17 @@ fastapi dev backend/src/app.py
 ```bash
 npm run dev --prefix frontend
 ```
-### Miscellaneous
+## Miscellaneous
 - To configure the application, edit the `backend/src/config.py` file.
 - To extract video frames:
 ```bash
-python backend/src/examples/extract.py
+python -m backend.examples.extract
 ```
 - To index feature vectors and object features (requires `ES_LOCAL_API_KEY` environment variable):
 ```bash
-python backend/src/examples/index.py
+python -m backend.examples.index
 ```
-- To perform a search, play with the search parameters in `backend/src/examples/search.py` and run (requires `ES_LOCAL_API_KEY` environment variable):
+- To perform a search, play with the search parameters in `-m backend.examples.search` and run (requires `ES_LOCAL_API_KEY` environment variable):
 ```bash
-python backend/src/examples/search.py
+python -m backend.examples.search
 ```

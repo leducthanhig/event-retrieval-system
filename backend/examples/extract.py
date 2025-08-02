@@ -3,10 +3,10 @@ import logging
 import pickle
 import json
 
-from cores.sampling import FrameSampler
-from cores.extracting import FeatureExtractor
+from ..src.cores.sampling import FrameSampler
+from ..src.cores.extracting import FeatureExtractor
 
-from configs import (
+from ..src.configs import (
     INP_VIDEO_DIR,
     VIDEO_METADATA_PATH,
     OUT_FRAME_DIR,

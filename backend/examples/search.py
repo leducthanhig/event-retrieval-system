@@ -3,9 +3,9 @@ import logging
 import pickle
 import json
 
-from cores.retrieving import Retriever
+from ..src.cores.retrieving import Retriever
 
-from configs import (
+from ..src.configs import (
     CLIP_MODEL,
     CLIP_PRETRAINED,
     VECTOR_DATA_PATH,

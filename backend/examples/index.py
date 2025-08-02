@@ -3,10 +3,10 @@ import logging
 import pickle
 import json
 
-from cores.indexing import VectorIndexer, TextIndexer
-from utils import encode_object_bbox
+from ..src.cores.indexing import VectorIndexer, TextIndexer
+from ..src.utils import encode_object_bbox
 
-from configs import (
+from ..src.configs import (
     VECTOR_DATA_PATH,
     OBJECT_DATA_PATH,
     FAISS_PRESET,
