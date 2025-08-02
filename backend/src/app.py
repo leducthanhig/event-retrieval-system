@@ -28,8 +28,8 @@ from configs import (
     ELASTIC_INDEX_NAME
 )
 
-STATIC_IMAGE_PATH = '/images'
-STATIC_VIDEO_PATH = '/videos'
+STATIC_IMAGE_PATH = 'images'
+STATIC_VIDEO_PATH = 'videos'
 
 # Configure logging
 logging.basicConfig(
@@ -70,8 +70,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount(STATIC_IMAGE_PATH, StaticFiles(directory=OUT_FRAME_DIR), name="images")
-app.mount(STATIC_VIDEO_PATH, StaticFiles(directory=INP_VIDEO_DIR), name="videos")
+app.mount(f"/{STATIC_IMAGE_PATH}", StaticFiles(directory=OUT_FRAME_DIR), name="images")
+app.mount(f"/{STATIC_VIDEO_PATH}", StaticFiles(directory=INP_VIDEO_DIR), name="videos")
 
 retriever = init_retriever()
 metadata = load_metadata()
