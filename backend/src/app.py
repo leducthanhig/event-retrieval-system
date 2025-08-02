@@ -3,13 +3,10 @@ import time
 import logging
 import json
 import pickle
-import tempfile
 from typing import List, Dict, Literal, Annotated
 
-import ffmpeg
-from fastapi import FastAPI, Body, BackgroundTasks
+from fastapi import FastAPI, Body
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -128,7 +125,7 @@ async def search(q: str,
     return SearchResponse(took=took, found=len(results), results=results)
 
 @app.get('/shots/{video_id}/{shot_id}')
-def get_shot_timestamps(video_id: str, shot_id: str) -> FileResponse:
+def get_shot_timestamps(video_id: str, shot_id: str):
     try:
         video_metadata = metadata[video_id]
     except KeyError:
@@ -143,10 +140,10 @@ def get_shot_timestamps(video_id: str, shot_id: str) -> FileResponse:
         logger.error(msg)
         raise RuntimeError(msg)
 
-    abs_path = video_metadata['path']
-    fps = get_avg_fps(abs_path)
+    path = video_metadata['path']
+    fps = get_avg_fps(path)
     start = shots[idx] / fps
     end = None if idx == len(shots) - 1 else (shots[idx + 1] - 1) / fps
-    public_path = abs_path.replace(INP_VIDEO_DIR, STATIC_VIDEO_PATH)
+    public_path = path.replace(INP_VIDEO_DIR, STATIC_VIDEO_PATH)
 
     return ShotResponse(video_path=public_path, start=start, end=end)
