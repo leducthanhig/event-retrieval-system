@@ -1,6 +1,7 @@
 # Development
 ## Pre-requisites
 - Python 3.10+
+- Micromamba
 - Node.js
 - npm
 - FFmpeg
@@ -19,7 +20,7 @@ pip install 'numpy<2' matplotlib pandas tensorflow opencv-python \
 GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/soCzech/TransNetV2.git
 python backend/download-weights.py
 
-conda install -c pytorch faiss-cpu
+micromamba install -c pytorch faiss-cpu
 ```
 - Set up Elasticsearch:
 ```bash
