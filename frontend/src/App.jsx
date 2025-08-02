@@ -14,10 +14,10 @@ function App() {
 
   // Load object labels from JSON file
   useEffect(() => {
-  fetch('/obj_name.json')
-    .then(res => res.json())
-    .then(data => setObjectLabels(data))
-    .catch(err => console.error("Failed to load object labels:", err));
+    fetch('/obj_name.json')
+      .then(res => res.json())
+      .then(data => setObjectLabels(data))
+      .catch(err => console.error("Failed to load object labels:", err));
   }, []);
 
   // Callback when a new box is drawn on canvas

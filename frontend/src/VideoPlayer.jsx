@@ -24,23 +24,23 @@ const VideoPlayer = ({ videoID, shotID, onClose }) => {
 
   useEffect(() => {
     const onLoaded = () => {
-        if (videoRef.current && startTime !== null) {
+      if (videoRef.current && startTime !== null) {
         videoRef.current.currentTime = startTime;
         videoRef.current.play();
-        }
+      }
     };
 
     const video = videoRef.current;
     if (video) {
-        video.addEventListener('loadedmetadata', onLoaded);
+      video.addEventListener('loadedmetadata', onLoaded);
     }
 
     return () => {
-        if (video) {
+      if (video) {
         video.removeEventListener('loadedmetadata', onLoaded);
-        }
+      }
     };
-    }, [videoUrl, startTime]);
+  }, [videoUrl, startTime]);
 
   return (
     <div
