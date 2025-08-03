@@ -3,7 +3,7 @@ setup:
 # 	install packages
 	pip install torch torchvision torchaudio \
 		--index-url https://download.pytorch.org/whl/cu118
-	pip install 'numpy<2' matplotlib pandas tensorflow opencv-python \
+	pip install 'numpy<2' matplotlib pandas tensorflow \
 		ffmpeg-python pillow ftfy regex tqdm 'fastapi[standard]' \
 		open_clip_torch
 

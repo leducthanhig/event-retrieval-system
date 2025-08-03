@@ -5,7 +5,6 @@ from shutil import rmtree
 
 import ffmpeg
 import numpy as np
-import cv2
 from tqdm import tqdm
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' # to disable the warning message
@@ -44,76 +43,109 @@ class FrameSampler:
         video_relpath = os.path.relpath(video_path, self.video_root_dir)
         video_relpath_splitext = os.path.splitext(video_relpath)[0]
         shot_root_dir = os.path.join(self.output_root_dir, video_relpath_splitext)
-        os.makedirs(shot_root_dir)
+        os.makedirs(shot_root_dir, exist_ok=True)
 
-        # Create extracting positions: start, 1/3, 2/3, and end indices
-        all_positions = [
-            [
+        # Calculate all frame positions to extract
+        all_positions = []
+        position_info = {}  # Maps position to (shot_idx, position_type)
+
+        for shot_idx, (start, end) in enumerate(shots):
+            positions = [
                 start,
                 int(start + (end - start) * 1/3),
                 int(start + (end - start) * 2/3),
                 end
-            ] for start, end in shots]
+            ]
 
-        # Save frames for each shot and position
-        cap = cv2.VideoCapture(video_path)
+            # Remove duplicates within a shot
+            unique_positions = sorted(set(positions))
+
+            for pos_idx, pos in enumerate(unique_positions):
+                all_positions.append(pos)
+
+                # Track which shot this frame belongs to and its type
+                position_type = None
+
+                # Handle short shots with fewer than 3 unique positions
+                if len(unique_positions) == 2:
+                    # Mark the first frame as "selected_1" and the second as "selected_2"
+                    if pos_idx == 0:
+                        position_type = "selected_1"
+                    elif pos_idx == 1:
+                        position_type = "selected_2"
+                elif len(unique_positions) > 2:
+                    # For longer shots, mark 1/3 and 2/3 positions as selected
+                    if pos == positions[1]:
+                        position_type = "selected_1"
+                    elif pos == positions[2]:
+                        position_type = "selected_2"
+
+                position_info[pos] = (shot_idx, position_type)
+
+        # Sort positions for easier processing
+        all_positions = sorted(set(all_positions))
+
+        # Create output temp directory
+        temp_dir = os.path.join(self.output_root_dir, "temp")
+        os.makedirs(temp_dir, exist_ok=True)
+
         try:
-            if not cap.isOpened():
-                logger.error(f'Failed to open video file {video_path}')
-                return
+            # Build select filter for all frames at once
+            select_conditions = '+'.join([f"eq(n,{pos})" for pos in all_positions])
 
+            # Use a single ffmpeg call to extract all frames
+            if self.use_gpu:
+                codec_name = get_video_codec(video_path)
+                nvidia_decoder = get_nvidia_decoder(codec_name)
+                input_stream = ffmpeg.input(video_path, hwaccel='cuda', vcodec=nvidia_decoder)
+            else:
+                input_stream = ffmpeg.input(video_path)
+
+            # Extract all frames in one operation
+            (
+                input_stream
+                .filter('select', select_conditions)
+                .output(os.path.join(temp_dir, 'frame_%06d.jpg'), vsync=0)
+                .run(quiet=True)
+            )
+
+            # Organize extracted frames into shot directories
             total_frames = 0
-            frame_idx = 0
-            for shot_idx, positions in enumerate(all_positions):
+            frame_files = sorted(os.listdir(temp_dir))
+
+            for i, frame_file in enumerate(frame_files):
+                if i >= len(all_positions):
+                    break
+
+                pos = all_positions[i]
+                shot_idx, position_type = position_info[pos]
+
+                # Create shot directory
                 shot_id = f"S{shot_idx:05}"
                 frame_dir = os.path.join(shot_root_dir, shot_id)
-                os.mkdir(frame_dir)
+                os.makedirs(frame_dir, exist_ok=True)
 
-                next_pos_idx = 0
-                while next_pos_idx < len(positions):
-                    ret, frame = cap.read()
-                    if not ret:
-                        logger.warning(f'Failed to read frame at {frame_idx} in {video_path}')
-                        frame_idx += 1
-                        continue
+                # Rename and move file
+                frame_id = f"F{pos:06}"
+                src_path = os.path.join(temp_dir, frame_file)
 
-                    if frame_idx == positions[next_pos_idx]:
-                        try:
-                            frame_id = f"F{frame_idx:06}"
-                            frame_path = os.path.join(frame_dir, f"{frame_id}.jpg")
-                            cv2.imwrite(frame_path, frame)
+                if position_type:
+                    dst_path = os.path.join(frame_dir, f"{frame_id}_selected.jpg")
+                else:
+                    dst_path = os.path.join(frame_dir, f"{frame_id}.jpg")
 
-                        except Exception as e:
-                            logger.error(f"Failed to write frame at {frame_idx} in {video_path}: {e}")
-
-                        # Skip duplicated positions
-                        while next_pos_idx < len(positions) and frame_idx == positions[next_pos_idx]:
-                            next_pos_idx += 1
-
-                    frame_idx += 1
-
-                # Mark the two between frames as selected
-                extracted_frames = [os.path.join(frame_dir, file)
-                                    for file in os.listdir(frame_dir)]
-                extracted_frames.sort()
-                num_frames = len(extracted_frames)
-
-                old_path = extracted_frames[(num_frames - 1) // 2]
-                old_name, ext = os.path.splitext(old_path)
-                new_path = old_name + '_selected' + ext
-                os.rename(old_path, new_path)
-
-                old_path = extracted_frames[(num_frames + 1) // 2]
-                old_name, ext = os.path.splitext(old_path)
-                new_path = old_name + '_selected' + ext
-                os.rename(old_path, new_path)
-
-                total_frames += num_frames
+                os.rename(src_path, dst_path)
+                total_frames += 1
 
             return total_frames
 
+        except Exception as e:
+            print(f"Error extracting frames from {video_path}: {e}")
+            return 0
+
         finally:
-            cap.release()
+            # Clean up temp directory
+            rmtree(temp_dir, ignore_errors=True)
 
     # Modified version of https://github.com/soCzech/TransNetV2/blob/master/inference/transnetv2.py
     def predict_frames(self, frames: np.ndarray):
