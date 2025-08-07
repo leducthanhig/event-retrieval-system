@@ -3,6 +3,7 @@ import logging
 import json
 import pickle
 from typing import List, Dict, Literal, Annotated
+from collections import defaultdict
 
 from fastapi import FastAPI, Body
 from fastapi.staticfiles import StaticFiles
@@ -16,11 +17,12 @@ from configs import (
     INP_VIDEO_DIR,
     OUT_FRAME_DIR,
     VIDEO_METADATA_PATH,
-    CLIP_MODEL,
-    CLIP_PRETRAINED,
-    VECTOR_DATA_PATH,
-    FAISS_SAVE_PATH,
 )
+
+MODELS = [
+    ('ViT-L-16-SigLIP-256', 'webli'),
+    ('ViT-L-14-quickgelu', 'dfn2b'),
+]
 
 STATIC_IMAGE_PATH = 'images'
 STATIC_VIDEO_PATH = 'videos'
@@ -31,14 +33,20 @@ logging.basicConfig(
     format='[%(asctime)s] %(levelname)s:%(name)s: %(message)s'
 )
 
-def init_retriever():
-    with open(VECTOR_DATA_PATH, 'rb') as f:
-        metadata = pickle.load(f)['paths']
+def init_retrievers(models: list[tuple[str, str]]) -> defaultdict[str, defaultdict[str, Retriever]]:
+    retrievers = defaultdict(defaultdict)
+    for model, pretrained in models:
+        with open(f'data/vectors_{model}_{pretrained}.pkl', 'rb') as f:
+            metadata = pickle.load(f)['paths']
 
-    return Retriever(FAISS_SAVE_PATH, metadata, CLIP_MODEL, CLIP_PRETRAINED)
+        retrievers[pretrained][model] = Retriever(f'data/index_{model}_{pretrained}.bin',
+                                                  metadata,
+                                                  model,
+                                                  pretrained)
+    return retrievers
 
-def load_metadata() -> Dict[str, Dict[str, str | List]]:
-    with open(VIDEO_METADATA_PATH) as f:
+def load_metadata(video_metadata_path: str) -> Dict[str, Dict[str, str | List]]:
+    with open(video_metadata_path) as f:
         metadata = json.load(f)
     return metadata
 
@@ -61,8 +69,8 @@ app.add_middleware(
 app.mount(f"/{STATIC_IMAGE_PATH}", StaticFiles(directory=OUT_FRAME_DIR), name="images")
 app.mount(f"/{STATIC_VIDEO_PATH}", StaticFiles(directory=INP_VIDEO_DIR), name="videos")
 
-retriever = init_retriever()
-metadata = load_metadata()
+retrievers = init_retrievers(MODELS)
+metadata = load_metadata(VIDEO_METADATA_PATH)
 
 class Shot(BaseModel):
     video_id: str
@@ -83,9 +91,11 @@ class ShotResponse(BaseModel):
 @app.post("/search")
 async def search(q: str,
                  pooling_method: Annotated[Literal['avg', 'max'], Body(embed=True)] = 'max',
-                 top: int = 10):
+                 model: Annotated[str, Body(embed=True)] = MODELS[0][0],
+                 pretrained: Annotated[str, Body(embed=True)] = MODELS[0][1],
+                 top: int = 10) -> SearchResponse:
     start = time.time()
-    results = retriever.search(q, pooling_method=pooling_method, k=top)
+    results = retrievers[pretrained][model].search(q, pooling_method=pooling_method, k=top)
     took = time.time() - start
 
     for res in results:
@@ -94,7 +104,7 @@ async def search(q: str,
     return SearchResponse(took=took, found=len(results), results=results)
 
 @app.get('/shots/{video_id}/{shot_id}')
-def get_shot_timestamps(video_id: str, shot_id: str):
+def get_shot_timestamps(video_id: str, shot_id: str) -> ShotResponse:
     try:
         video_metadata = metadata[video_id]
     except KeyError:
