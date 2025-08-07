@@ -22,7 +22,7 @@ class Retriever:
         self.metadata = metadata
         self.device = device
 
-        self.model, _, self.preprocess = create_model_and_transforms(clip_model,
+        self.model, _, self.transforms = create_model_and_transforms(clip_model,
                                                                      clip_weights,
                                                                      device=device)
         self.tokenizer = get_tokenizer(clip_model)
@@ -43,8 +43,8 @@ class Retriever:
     def search_by_image(self, image_query_path: str, k=10):
         """Search for relevant images the image query."""
         image = Image.open(image_query_path)
-        processed_image = self.preprocess(image).unsqueeze(0).to(self.device)
-        features = self.model.encode_image(processed_image)
+        transformed_image = self.transforms(image).unsqueeze(0).to(self.device)
+        features = self.model.encode_image(transformed_image)
         features /= features.norm(dim=-1, keepdim=True)
         features = features.cpu().numpy()
         return self.semantic_search(features, k)
