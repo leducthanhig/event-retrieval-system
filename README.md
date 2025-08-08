@@ -29,6 +29,12 @@ npm install
 ```
 ## Run the application
 ### Backend
+- Activate the environment
+```bash
+eval "$(/c/micromamba/micromamba shell hook --shell bash)"
+micromamba activate ner-backend
+```
+- Run
 ```bash
 fastapi dev backend/src/app.py
 ```
