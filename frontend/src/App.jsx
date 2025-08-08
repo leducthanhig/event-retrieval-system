@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react';
-import VideoPlayer from './VideoPlayer';
+import { useState } from 'react';
+import SearchBar from './components/SearchBar';
+import ModelSelector from './components/ModelSelector';
+import SearchResult from './components/SearchResult';
+import VideoPlayer from './components/VideoPlayer';
 import './App.css';
 
 function App() {
@@ -9,21 +12,52 @@ function App() {
   const [hasSearched, setHasSearched] = useState(false);
   const [selected, setSelected] = useState(null);
 
-  // Handle search action
+  const [mode, setMode] = useState('single'); // 'single' or 'multi'
+  const [selectedModel, setSelectedModel] = useState({
+    model_name: 'ViT-L-16-SigLIP-256',
+    pretrained: 'webli'
+  });
+  const [weights, setWeights] = useState(['0.5', '0.5']); // as string
+
   const handleSearch = async () => {
     setError('');
     setHasSearched(true);
 
+    // Validate input
+    if (mode === 'single' && !selectedModel) {
+      setError('Please select a model.');
+      return;
+    }
+    if (mode === 'multi') {
+      const w1 = parseFloat(weights[0]);
+      const w2 = parseFloat(weights[1]);
+      if (isNaN(w1) || isNaN(w2)) {
+        setError('Please enter valid weights.');
+        return;
+      }
+    }
+
     try {
-      // Prepare request body according to backend schema
-      const body = {
-        pooling_method: 'max'
-      };
+      let body = { pooling_method: 'max' };
+
+      if (mode === 'single') {
+        if (!selectedModel) {
+          setError("Please select a model.");
+          return;
+        }
+        body.models = [selectedModel];
+      } else {
+        body.models = [
+          { model_name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
+          { model_name: 'ViT-L-14-quickgelu', pretrained: 'dfn2b' }
+        ];
+        body.weights = weights.map((w) => parseFloat(w));
+      }
 
       const response = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(query)}&top=100`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) throw new Error(`Failed to fetch (${response.status})`);
@@ -36,115 +70,40 @@ function App() {
   };
 
   return (
-    <div style={{ padding: '1rem', fontFamily: 'sans-serif' }}>
-      <h1 style={{ marginBottom: '3rem' }}>News Event Search</h1>
+    <div style={{ padding: '1rem', fontFamily: 'sans-serif', margin: '0 auto' }}>
+      <h1 style={{ marginBottom: '2rem' }}>News Event Search</h1>
 
-      {/* Text query input and Search button */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-        <input
-          type="text"
-          placeholder="Enter your query..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleSearch();
-          }}
-          style={{ width: '400px', maxWidth: '480px', padding: '0.5rem', fontSize: '1rem' }}
+      {/* Search Input */}
+      <SearchBar
+        query={query}
+        onChange={setQuery}
+        onSubmit={handleSearch}
+      />
+
+      {/* Model selection */}
+      <div style={{ maxWidth: '500px', margin: '0 auto', padding: '0 1rem' }}>
+        <ModelSelector
+          mode={mode}
+          setMode={setMode}
+          selectedModel={selectedModel}
+          setSelectedModel={setSelectedModel}
+          weights={weights}
+          setWeights={setWeights}
         />
-        <button
-          style={{ padding: '0.5rem 1rem' }}
-          onClick={handleSearch}
-        >
-          Search
-        </button>
       </div>
 
-      {/* Display error message if any */}
+      {/* Error message */}
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
-      {/* Search Results Section */}
+      {/* Results */}
       {hasSearched && (
         <div style={{ marginTop: '0.5rem' }}>
           <h2>Search Results</h2>
-          {results.length === 0 ? (
-            <p>No results found.</p>
-          ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(6, 1fr)',
-                gap: '0.5rem',
-              }}
-            >
-              {results.map((item, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    height: '145px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    border: '1px solid #ccc',
-                    padding: '0.1rem',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                    position: 'relative',
-                  }}
-                >
-                  <img
-                    src={`http://localhost:8000/${item.thumbnail}`}
-                    alt="Thumbnail"
-                    style={{
-                      width: '100%',
-                      height: 'auto',
-                      maxHeight: '120px',
-                      cursor: 'pointer',
-                      borderRadius: '4px',
-                      objectFit: 'cover'
-                    }}
-                    onClick={() => setSelected(item)}
-                  />
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      marginTop: '0rem',
-                      gap: '0.7rem',
-                    }}
-                  >
-                    <button
-                      onClick={() => setSelected(item)}
-                      title="View Video"
-                      style={{
-                        fontSize: '0.9rem',
-                        borderRadius: '4px',
-                        background: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      📺
-                    </button>
-                    <button
-                      onClick={() => alert(JSON.stringify(item, null, 2))}
-                      title="Details"
-                      style={{
-                        fontSize: '0.9rem',
-                        borderRadius: '4px',
-                        background: 'none',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      ℹ️
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <SearchResult results={results} onSelect={setSelected} />
         </div>
       )}
 
-      {/* Video Player Section */}
+      {/* Video player */}
       {selected && (
         <VideoPlayer
           videoID={selected.video_id}
