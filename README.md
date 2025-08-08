@@ -14,7 +14,7 @@ pip install torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu118
 pip install 'numpy<2' matplotlib pandas tensorflow \
     ffmpeg-python pillow ftfy regex tqdm 'fastapi[standard]' \
-    open_clip_torch transformers
+    open_clip_torch transformers google-genai
 
 GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/soCzech/TransNetV2.git
 python backend/download-weights.py

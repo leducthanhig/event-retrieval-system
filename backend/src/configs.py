@@ -19,6 +19,6 @@ MODELS = [
 ]
 
 DEFAULT_MODEL = {
-    'model_name': MODELS[0][0],
+    'name': MODELS[0][0],
     'pretrained': MODELS[0][1],
 }
