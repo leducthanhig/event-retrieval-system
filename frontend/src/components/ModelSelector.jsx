@@ -1,9 +1,4 @@
-const AVAILABLE_MODELS = [
-  { label: 'ViT-L-16-SigLIP-256', model_name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
-  { label: 'ViT-L-14-quickgelu', model_name: 'ViT-L-14-quickgelu', pretrained: 'dfn2b' }
-];
-
-function ModelSelector({ mode, setMode, selectedModel, setSelectedModel, weights, setWeights }) {
+function ModelSelector({ mode, setMode, selectedModel, setSelectedModel, weights, setWeights, AVAILABLE_MODELS }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', gap: '2rem' }}>
       {/* Single model */}

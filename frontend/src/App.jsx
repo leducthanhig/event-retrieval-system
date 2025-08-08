@@ -5,6 +5,18 @@ import SearchResult from './components/SearchResult';
 import VideoPlayer from './components/VideoPlayer';
 import './App.css';
 
+const AVAILABLE_MODELS = [
+  { label: 'ViT-L-16-SigLIP-256', model_name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
+  { label: 'ViT-L-14-quickgelu', model_name: 'ViT-L-14-quickgelu', pretrained: 'dfn2b' }
+];
+
+function toAPISearchModel(uiModel) {
+  return {
+    name: uiModel.model_name,
+    pretrained: uiModel.pretrained,
+  };
+}
+
 function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -13,10 +25,7 @@ function App() {
   const [selected, setSelected] = useState(null);
 
   const [mode, setMode] = useState('single'); // 'single' or 'multi'
-  const [selectedModel, setSelectedModel] = useState({
-    model_name: 'ViT-L-16-SigLIP-256',
-    pretrained: 'webli'
-  });
+  const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0]);
   const [weights, setWeights] = useState(['0.5', '0.5']); // as string
 
   const handleSearch = async () => {
@@ -45,11 +54,11 @@ function App() {
           setError("Please select a model.");
           return;
         }
-        body.models = [selectedModel];
+        body.models = [toAPISearchModel(selectedModel)];
       } else {
         body.models = [
-          { model_name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
-          { model_name: 'ViT-L-14-quickgelu', pretrained: 'dfn2b' }
+          { name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
+          { name: 'ViT-L-14-quickgelu', pretrained: 'dfn2b' }
         ];
         body.weights = weights.map((w) => parseFloat(w));
       }
@@ -89,6 +98,7 @@ function App() {
           setSelectedModel={setSelectedModel}
           weights={weights}
           setWeights={setWeights}
+          AVAILABLE_MODELS={AVAILABLE_MODELS}
         />
       </div>
 
