@@ -51,9 +51,9 @@ class FeatureExtractor:
         }
 
     def init_spatial_feature_extractor(self, model_name, pretrained):
-        model, _, preprocess = create_model_and_transforms(model_name, pretrained, device=self.device)
+        model, _, transforms = create_model_and_transforms(model_name, pretrained, device=self.device)
         model.eval()
-        dataset = ImageDataset(self.image_paths, preprocess, permute_channels=False)
+        dataset = ImageDataset(self.image_paths, transforms, permute_channels=False)
 
         return {
             'model': model,

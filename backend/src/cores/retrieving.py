@@ -22,7 +22,7 @@ class Retriever:
         self.metadata = metadata
         self.device = device
 
-        self.model, _, self.preprocess = create_model_and_transforms(clip_model,
+        self.model, _, self.transforms = create_model_and_transforms(clip_model,
                                                                      clip_weights,
                                                                      device=device)
         self.tokenizer = get_tokenizer(clip_model)
@@ -43,8 +43,8 @@ class Retriever:
     def search_by_image(self, image_query_path: str, k=10):
         """Search for relevant images the image query."""
         image = Image.open(image_query_path)
-        processed_image = self.preprocess(image).unsqueeze(0).to(self.device)
-        features = self.model.encode_image(processed_image)
+        transformed_image = self.transforms(image).unsqueeze(0).to(self.device)
+        features = self.model.encode_image(transformed_image)
         features /= features.norm(dim=-1, keepdim=True)
         features = features.cpu().numpy()
         return self.semantic_search(features, k)
@@ -196,3 +196,44 @@ class Retriever:
         dis_range = dis_max - dis_min
         return [(path, 1 - (dis - dis_min) / dis_range)
                 for path, dis in results]
+
+    @staticmethod
+    def combine_results(all_results: list[list[dict]],
+                        weights: list[float]) -> list[dict]:
+        """Combine the results from multi-model search by the given weights."""
+        # Group results
+        grouped_results = defaultdict(lambda: defaultdict())
+        for results in all_results:
+            for result in results:
+                video_id = result['video_id']
+                shot_id = result['shot_id']
+                grouped_results[video_id][shot_id] = {
+                    'thumbnail': result['thumbnail'],
+                    'scores': [0] * len(weights)
+                }
+
+        for idx, results in enumerate(all_results):
+            for result in results:
+                video_id = result['video_id']
+                shot_id = result['shot_id']
+                score = result['score']
+                grouped_results[video_id][shot_id]['scores'][idx] = score
+
+        # Combine results with the given weights
+        combined_results = []
+        for video_id in grouped_results:
+            for shot_id in grouped_results[video_id]:
+                shot = grouped_results[video_id][shot_id]
+                combined_score = sum([w * score
+                                      for w, score in zip(weights, shot['scores'])])
+                combined_results.append({
+                    'video_id': video_id,
+                    'shot_id': shot_id,
+                    'thumbnail': shot['thumbnail'],
+                    'score': combined_score,
+                })
+
+        # Sort results by the combined score in descending order
+        combined_results.sort(key=lambda x: x['score'], reverse=True)
+
+        return combined_results
