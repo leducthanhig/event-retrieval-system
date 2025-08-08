@@ -27,6 +27,7 @@ function App() {
   const [mode, setMode] = useState('single'); // 'single' or 'multi'
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0]);
   const [weights, setWeights] = useState(['0.5', '0.5']); // as string
+  const [isRewriting, setIsRewriting] = useState(false);
 
   const handleSearch = async () => {
     setError('');
@@ -78,6 +79,42 @@ function App() {
     }
   };
 
+  const handleRewrite = async () => {
+    if (!query.trim()) return;
+    setIsRewriting(true); 
+
+    const payload = {
+      text: query,
+      model: 'gemini-2.5-flash-lite',
+      clip_model: {
+        name: selectedModel.model_name,
+        pretrained: selectedModel.pretrained,
+      },
+      thinking: false,
+    };
+
+    try {
+      const response = await fetch('http://localhost:8000/rewrite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (data.rewritten_query) {
+        setQuery(data.rewritten_query);
+      } else {
+        alert('Rewrite failed: No rewritten query returned.');
+      }
+    } catch (error) {
+      console.error('Rewrite error:', error);
+      alert('Rewrite failed due to network/server error.');
+    } finally {
+      setIsRewriting(false);
+    }
+  };
+
   return (
     <div style={{ padding: '1rem', fontFamily: 'sans-serif', margin: '0 auto' }}>
       <h1 style={{ marginBottom: '2rem' }}>News Event Search</h1>
@@ -87,6 +124,8 @@ function App() {
         query={query}
         onChange={setQuery}
         onSubmit={handleSearch}
+        onRewrite={handleRewrite}
+        isRewriting={isRewriting}
       />
 
       {/* Model selection */}

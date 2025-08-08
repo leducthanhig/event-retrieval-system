@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 
-function SearchBar({ query, onChange, onSubmit }) {
+function SearchBar({ query, onChange, onSubmit, onRewrite, isRewriting }) {
   const textareaRef = useRef(null);
 
   // Auto-resize textarea height based on content
@@ -33,6 +33,7 @@ function SearchBar({ query, onChange, onSubmit }) {
             onSubmit();
           }
         }}
+        spellCheck={false}
         rows={1}
         style={{
           width: '400px',
@@ -51,8 +52,11 @@ function SearchBar({ query, onChange, onSubmit }) {
         <button style={{ padding: '0.5rem 1rem' }} onClick={onSubmit}>
           Search
         </button>
-        <button style={{ padding: '0.5rem 1rem' }}>
-          Rewrite
+        <button 
+          style={{ padding: '0.5rem 1rem' }} 
+          onClick={onRewrite} 
+          disabled={isRewriting}>
+            {isRewriting ? 'Rewriting...' : 'Rewrite'}
         </button>
       </div>
     </div>
