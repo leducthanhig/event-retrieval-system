@@ -6,6 +6,7 @@
 - npm
 - FFmpeg
 - GNU Make (Optional, for Makefile commands)
+- Gemini API key (create and get one [here](https://aistudio.google.com/apikey))
 ## Setup
 ### Backend
 - Install Python dependencies:
@@ -29,12 +30,6 @@ npm install
 ```
 ## Run the application
 ### Backend
-- Activate the environment
-```bash
-eval "$(/c/micromamba/micromamba shell hook --shell bash)"
-micromamba activate ner-backend
-```
-- Run
 ```bash
 fastapi dev backend/src/app.py
 ```
