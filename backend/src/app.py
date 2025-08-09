@@ -185,6 +185,7 @@ class App(FastAPI):
         async def rewrite(req: RewriteRequest) -> RewriteResponse:
             """Rewrites a query to make it more descriptive for CLIP models."""
             prompt = f"Rewrite the query '{req.text}' in English to be more descriptive " \
+                     f"and aligned with web-style captions " \
                      f"for CLIP {req.clip_model.name} trained on {req.clip_model.pretrained}. " \
                      f"Use Google Search if needed. " \
                      f"Just return the rewritten query prefixed with 'Rewritten query:'."
