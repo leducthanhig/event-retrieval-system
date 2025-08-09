@@ -27,11 +27,19 @@ function App() {
   const [mode, setMode] = useState('single'); // 'single' or 'multi'
   const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0]);
   const [weights, setWeights] = useState(['0.5', '0.5']); // as string
+
+  const [isSearching, setIsSearching] = useState(false);
   const [isRewriting, setIsRewriting] = useState(false);
 
   const handleSearch = async () => {
     setError('');
     setHasSearched(true);
+
+    // Ignore empty query
+    if (!query.trim()) {
+      setError('Please enter a query.');
+      return;
+    }
 
     // Validate input
     if (mode === 'single' && !selectedModel) {
@@ -46,6 +54,8 @@ function App() {
         return;
       }
     }
+
+    setIsSearching(true);
 
     try {
       let body = { pooling_method: 'max' };
@@ -76,6 +86,8 @@ function App() {
     } catch (err) {
       console.error('Search error:', err);
       setError('Error calling API: ' + err.message);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -125,6 +137,7 @@ function App() {
         onChange={setQuery}
         onSubmit={handleSearch}
         onRewrite={handleRewrite}
+        isSearching={isSearching}
         isRewriting={isRewriting}
       />
 
