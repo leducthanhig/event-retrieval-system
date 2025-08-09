@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
@@ -25,6 +26,9 @@ from configs import (
     MODELS,
     DEFAULT_MODEL,
 )
+
+# Load environment variables from the .env file
+load_dotenv('backend/.env')
 
 # Configure logging
 logging.basicConfig(
@@ -181,6 +185,7 @@ class App(FastAPI):
         async def rewrite(req: RewriteRequest) -> RewriteResponse:
             """Rewrites a query to make it more descriptive for CLIP models."""
             prompt = f"Rewrite the query '{req.text}' in English to be more descriptive " \
+                     f"and aligned with web-style captions " \
                      f"for CLIP {req.clip_model.name} trained on {req.clip_model.pretrained}. " \
                      f"Use Google Search if needed. " \
                      f"Just return the rewritten query prefixed with 'Rewritten query:'."
