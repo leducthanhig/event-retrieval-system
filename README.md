@@ -15,12 +15,16 @@ pip install torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu118
 pip install 'numpy<2' matplotlib pandas tensorflow \
     ffmpeg-python pillow ftfy regex tqdm 'fastapi[standard]' \
-    open_clip_torch transformers google-genai
+    open_clip_torch transformers google-genai python-dotenv
 
 GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/soCzech/TransNetV2.git
 python backend/download-weights.py
 
 micromamba install -c pytorch faiss-cpu
+```
+- Create a `.env` file in the `backend` directory and add your Gemini API key:
+```
+GEMINI_API_KEY=your_api_key_here
 ```
 ### Frontend
 - Install Node.js dependencies:

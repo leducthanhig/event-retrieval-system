@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
@@ -25,6 +26,9 @@ from configs import (
     MODELS,
     DEFAULT_MODEL,
 )
+
+# Load environment variables from the .env file
+load_dotenv('backend/.env')
 
 # Configure logging
 logging.basicConfig(
