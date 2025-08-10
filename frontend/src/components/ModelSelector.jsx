@@ -32,7 +32,7 @@ function ModelSelector({ mode, setMode, selectedModel, setSelectedModel, weights
 
         <div style={{ paddingLeft: '0rem' }}>
           {AVAILABLE_MODELS.map((model) => (
-            <div key={model.model_name} style={{ display: 'flex', alignItems: 'center', marginTop: '0.5rem', marginBottom: '0.3rem' }}>
+            <label key={model.model_name} style={{ display: 'flex', alignItems: 'center', marginTop: '0.5rem', marginBottom: '0.3rem', cursor: 'pointer' }}>
               <input
                 type="radio"
                 name="model"
@@ -43,7 +43,7 @@ function ModelSelector({ mode, setMode, selectedModel, setSelectedModel, weights
                 style={{ marginRight: '0.5rem' }}
               />
               <span>{model.label}</span>
-            </div>
+            </label>
           ))}
         </div>
       </div>
