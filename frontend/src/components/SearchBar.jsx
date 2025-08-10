@@ -108,7 +108,7 @@ function SearchBar({ query, onChange, onSubmit, onRewrite, isSearching, isRewrit
           aria-busy={isSearching}
         >
           {isSearching && <Spinner />}
-          {isSearching ? 'Searching...' : 'Search'}
+          {isSearching ? 'Searching' : 'Search'}
         </button>
 
         <button
@@ -118,7 +118,7 @@ function SearchBar({ query, onChange, onSubmit, onRewrite, isSearching, isRewrit
           aria-busy={isRewriting}
         >
           {isRewriting && <Spinner />}
-          {isRewriting ? 'Rewriting...' : 'Rewrite'}
+          {isRewriting ? 'Rewriting' : 'Rewrite'}
         </button>
       </div>
     </div>
