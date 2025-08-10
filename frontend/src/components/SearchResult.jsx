@@ -1,6 +1,10 @@
 import React from 'react';
 
-function SearchResult({ results, onSelect }) {
+function SearchResult({ isSearching, results, onSelect }) {
+  if (isSearching) {
+    return <p>Searching...</p>
+  }
+
   if (results.length === 0) {
     return <p>No results found.</p>;
   }

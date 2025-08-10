@@ -93,7 +93,7 @@ function App() {
 
   const handleRewrite = async () => {
     if (!query.trim()) return;
-    setIsRewriting(true); 
+    setIsRewriting(true);
 
     const payload = {
       text: query,
@@ -161,7 +161,7 @@ function App() {
       {hasSearched && (
         <div style={{ marginTop: '0.5rem' }}>
           <h2>Search Results</h2>
-          <SearchResult results={results} onSelect={setSelected} />
+          <SearchResult isSearching={isSearching} results={results} onSelect={setSelected} />
         </div>
       )}
 
