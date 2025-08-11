@@ -143,7 +143,7 @@ class App(FastAPI):
             for model in models:
                 retriever = self.retrievers[model.pretrained][model.name]
                 all_results.append(
-                    retriever.search(q, pooling_method=body.pooling_method, k=top))
+                    retriever.search(q, pooling_method=body.pooling_method, k=top*2))
             if len(all_results) > 1:
                 results = Retriever.combine_results(all_results, body.weights)
             else:
@@ -154,7 +154,8 @@ class App(FastAPI):
             for res in results:
                 res['thumbnail'] = res['thumbnail'].replace(OUT_FRAME_DIR, STATIC_IMAGE_PATH)
 
-            return SearchResponse(took=took, found=len(results), results=results)
+            found = min(len(results), top)
+            return SearchResponse(took=took, found=found, results=results[:found])
 
         @self.get('/shots/{video_id}/{shot_id}')
         async def get_shot_timestamps(video_id: str, shot_id: str) -> ShotResponse:
