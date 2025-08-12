@@ -10,9 +10,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+from llama_cpp import Llama
 
 from cores.retrieving import Retriever
 from utils import get_avg_fps
@@ -26,9 +24,6 @@ from configs import (
     MODELS,
     DEFAULT_MODEL,
 )
-
-# Load environment variables from the .env file
-load_dotenv('backend/.env')
 
 # Configure logging
 logging.basicConfig(
@@ -65,7 +60,6 @@ class ShotResponse(BaseModel):
 
 class RewriteRequest(BaseModel):
     text: str
-    model: Literal['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'] = 'gemini-2.5-flash-lite'
     clip_model: SearchModel = SearchModel(**DEFAULT_MODEL)
     thinking: bool = False
 
@@ -93,7 +87,13 @@ class App(FastAPI):
         self.mount_dirs(mount_paths)
         self.init_routes()
 
-        self.genai_client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
+        self.llm = Llama.from_pretrained(
+            repo_id="lmstudio-community/Qwen3-4B-GGUF",
+	        filename="Qwen3-4B-Q4_K_M.gguf",
+            n_threads=8,
+            n_batch=512,
+            n_ctx=4096,
+        )
 
     def mount_dirs(self, mount_paths: list[tuple[str, str]]):
         """Mounts directories to specific paths for serving static files."""
@@ -186,40 +186,30 @@ class App(FastAPI):
         async def rewrite(req: RewriteRequest) -> RewriteResponse:
             """Rewrites a query to make it more descriptive for CLIP models."""
             prompt = f"Rewrite the query '{req.text}' in English to be more descriptive " \
-                     f"and aligned with web-style captions " \
-                     f"for CLIP {req.clip_model.name} trained on {req.clip_model.pretrained}. " \
-                     f"Use Google Search if needed. " \
-                     f"Just return the rewritten query prefixed with 'Rewritten query:'."
-            contents = [
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_text(text=prompt),
-                    ],
-                ),
-            ]
+                     f"and aligned with web-style captions for CLIP {req.clip_model.name} " \
+                     f"trained on {req.clip_model.pretrained}."
 
-            tools = [
-                types.Tool(googleSearch=types.GoogleSearch()),
-            ]
+            if not req.thinking:
+                prompt += '/no_think'
 
-            generate_content_config = types.GenerateContentConfig(
-                thinking_config=types.ThinkingConfig(thinking_budget=-1 if req.thinking else 0),
-                tools=tools,
+            response = self.llm.create_chat_completion(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+                response_format={
+                    "type": "json_object",
+                    "schema": {
+                        "type": "object",
+                        "properties": {"rewritten_query": {"type": "string"}},
+                        "required": ["rewritten_query"],
+                    },
+                },
             )
 
-            response = self.genai_client.models.generate_content(
-                model=req.model,
-                contents=contents,
-                config=generate_content_config,
-            )
-
-            rewritten = ''
-            for part in response.candidates[0].content.parts:
-                if "Rewritten query:" in part.text:
-                    rewritten = part.text.split("Rewritten query:")[1].strip()
-
-            return RewriteResponse(rewritten_query=rewritten)
+            return RewriteResponse(**eval(response['choices'][0]['message']['content']))
 
 origins = [
     "http://localhost:5173",

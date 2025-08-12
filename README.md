@@ -6,25 +6,19 @@
 - npm
 - FFmpeg
 - GNU Make (Optional, for Makefile commands)
-- Gemini API key (create and get one [here](https://aistudio.google.com/apikey))
 ## Setup
 ### Backend
 - Install Python dependencies:
 ```bash
-pip install torch torchvision torchaudio \
+pip install "numpy<2" torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu118
-pip install 'numpy<2' matplotlib pandas tensorflow \
-    ffmpeg-python pillow ftfy regex tqdm 'fastapi[standard]' \
-    open_clip_torch transformers google-genai python-dotenv
+pip install "numpy<2" matplotlib tensorflow ffmpeg-python \
+    pillow ftfy regex tqdm "fastapi[standard]" open_clip_torch \
+    transformers "huggingface_hub[hf_xet]" llama-cpp-python
+micromamba install -c pytorch faiss-cpu
 
 GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/soCzech/TransNetV2.git
 python backend/download-weights.py
-
-micromamba install -c pytorch faiss-cpu
-```
-- Create a `.env` file in the `backend` directory and add your Gemini API key:
-```
-GEMINI_API_KEY=your_api_key_here
 ```
 ### Frontend
 - Install Node.js dependencies:

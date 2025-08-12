@@ -97,12 +97,11 @@ function App() {
 
     const payload = {
       text: query,
-      model: 'gemini-2.5-flash-lite',
       clip_model: {
         name: selectedModel.model_name,
         pretrained: selectedModel.pretrained,
       },
-      thinking: false,
+      thinking: true,
     };
 
     try {
