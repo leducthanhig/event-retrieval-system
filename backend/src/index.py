@@ -1,12 +1,15 @@
 import logging
-import pickle
+
+import numpy as np
 
 from cores.indexing import VectorIndexer
 
 from configs import (
-    VECTOR_DATA_PATH,
+    CLIP_VECTOR_DATA_PATH,
+    DINO_VECTOR_DATA_PATH,
+    CLIP_INDEX_SAVE_PATH,
+    DINO_INDEX_SAVE_PATH,
     FAISS_PRESET,
-    FAISS_SAVE_PATH,
 )
 
 # Configure logging
@@ -16,10 +19,18 @@ logging.basicConfig(
 )
 
 if __name__ == '__main__':
-    # Load data from disk
-    with open(VECTOR_DATA_PATH, 'rb') as f:
-        vector_data = pickle.load(f)
+    data_paths = [
+        CLIP_VECTOR_DATA_PATH,
+        DINO_VECTOR_DATA_PATH,
+    ]
+    save_paths = [
+        CLIP_INDEX_SAVE_PATH,
+        DINO_INDEX_SAVE_PATH,
+    ]
+    for data_path, save_path in zip(data_paths, save_paths):
+        # Load data from disk
+        vector_data = np.load(data_path)
 
-    # Index features
-    vec_indexer = VectorIndexer(FAISS_PRESET)
-    vec_indexer.create_index(vector_data['all_vectors'], FAISS_SAVE_PATH)
+        # Index features
+        vec_indexer = VectorIndexer(FAISS_PRESET)
+        vec_indexer.create_index(vector_data, save_path)

@@ -2,7 +2,6 @@ import os
 import time
 import logging
 import json
-import pickle
 from typing import Literal
 from collections import defaultdict
 
@@ -21,10 +20,14 @@ from configs import (
     INP_VIDEO_DIR,
     OUT_FRAME_DIR,
     VIDEO_METADATA_PATH,
+    PROCESSED_FRAME_DATA_PATH,
+    DATA_ROOT_DIR,
     STATIC_IMAGE_PATH,
     STATIC_VIDEO_PATH,
-    MODELS,
-    DEFAULT_MODEL,
+    CLIP_MODELS,
+    DEFAULT_CLIP_MODEL,
+    DINO_MODEL,
+    DINO_INDEX_SAVE_PATH,
 )
 
 # Load environment variables from the .env file
@@ -43,7 +46,7 @@ class SearchModel(BaseModel):
     pretrained: str
 
 class SearchBody(BaseModel):
-    models: SearchModel | list[SearchModel] = SearchModel(**DEFAULT_MODEL)
+    models: SearchModel | list[SearchModel] = SearchModel(**DEFAULT_CLIP_MODEL)
     weights: list[float] | None = None
     pooling_method: Literal['avg', 'max'] = 'max'
 
@@ -66,7 +69,7 @@ class ShotResponse(BaseModel):
 class RewriteRequest(BaseModel):
     text: str
     model: Literal['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'] = 'gemini-2.5-flash-lite'
-    clip_model: SearchModel = SearchModel(**DEFAULT_MODEL)
+    clip_model: SearchModel = SearchModel(**DEFAULT_CLIP_MODEL)
     thinking: bool = False
 
 class RewriteResponse(BaseModel):
@@ -76,9 +79,8 @@ class App(FastAPI):
     def __init__(self,
                  origins: list[str],
                  mount_paths: list[tuple[str, str]],
-                 video_metadata_path: str,
-                 models: list[tuple[str, str]]):
-        super().__init__()
+                 **kwargs):
+        super().__init__(**kwargs)
 
         self.add_middleware(
             CORSMiddleware,
@@ -88,8 +90,8 @@ class App(FastAPI):
             allow_headers=["*"],
         )
 
-        self.init_retrievers(models)
-        self.load_metadata(video_metadata_path)
+        self.init_retrievers()
+        self.load_metadata()
         self.mount_dirs(mount_paths)
         self.init_routes()
 
@@ -100,21 +102,23 @@ class App(FastAPI):
         for path, dir in mount_paths:
             self.mount(path, StaticFiles(directory=dir), name=os.path.basename(path))
 
-    def init_retrievers(self, models: list[tuple[str, str]]):
+    def init_retrievers(self):
         """Initializes retrievers for each model and pretrained weights."""
         self.retrievers: defaultdict[str, defaultdict[str, Retriever]] = defaultdict(defaultdict)
-        for model, pretrained in models:
-            with open(f'data/vectors_{model}_{pretrained}.pkl', 'rb') as f:
-                metadata = pickle.load(f)['paths']
-
-            self.retrievers[pretrained][model] = Retriever(f'data/index_{model}_{pretrained}.bin',
+        for model, pretrained in CLIP_MODELS:
+            clip_index_path = os.path.join(DATA_ROOT_DIR, f"index_{model}_{pretrained}.bin")
+            with open(PROCESSED_FRAME_DATA_PATH) as f:
+                metadata = json.load(f)
+            self.retrievers[pretrained][model] = Retriever(clip_index_path,
+                                                           DINO_INDEX_SAVE_PATH,
                                                            metadata,
                                                            model,
-                                                           pretrained)
+                                                           pretrained,
+                                                           DINO_MODEL)
 
-    def load_metadata(self, video_metadata_path: str):
+    def load_metadata(self):
         """Loads video metadata from a JSON file."""
-        with open(video_metadata_path) as f:
+        with open(VIDEO_METADATA_PATH) as f:
             self.metadata: dict[str, dict[str, str | list[int]]] = json.load(f)
 
     def init_routes(self):
@@ -230,4 +234,4 @@ mount_paths = [
     (f"/{STATIC_VIDEO_PATH}", INP_VIDEO_DIR),
 ]
 
-app = App(origins, mount_paths, VIDEO_METADATA_PATH, MODELS)
+app = App(origins, mount_paths)

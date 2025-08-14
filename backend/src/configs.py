@@ -1,24 +1,30 @@
-INP_VIDEO_DIR = 'data/videos'
-OUT_FRAME_DIR = 'data/keyframes'
-VIDEO_METADATA_PATH = 'data/metadata.json'
+DATA_ROOT_DIR = 'data'
+
+INP_VIDEO_DIR = f"{DATA_ROOT_DIR}/videos"
+OUT_FRAME_DIR = f"{DATA_ROOT_DIR}/keyframes"
+VIDEO_METADATA_PATH = f"{DATA_ROOT_DIR}/metadata.json"
+
+PROCESSED_FRAME_DATA_PATH = f"{DATA_ROOT_DIR}/processed_frame_data.json"
 
 CLIP_MODEL = 'ViT-L-16-SigLIP-256'
 CLIP_PRETRAINED = 'webli'
+CLIP_VECTOR_DATA_PATH = f"{DATA_ROOT_DIR}/vectors_{CLIP_MODEL}_{CLIP_PRETRAINED}.npy"
 
-VECTOR_DATA_PATH = f'data/vectors_{CLIP_MODEL}_{CLIP_PRETRAINED}.pkl'
+DINO_MODEL = 'facebook/dinov2-large'
+DINO_VECTOR_DATA_PATH = f"{DATA_ROOT_DIR}/vectors_{DINO_MODEL.replace('/', '-')}.npy"
 
 FAISS_PRESET = 'high_accuracy'
-FAISS_SAVE_PATH = f'data/index_{CLIP_MODEL}_{CLIP_PRETRAINED}.bin'
+CLIP_INDEX_SAVE_PATH = f"{DATA_ROOT_DIR}/index_{CLIP_MODEL}_{CLIP_PRETRAINED}.bin"
+DINO_INDEX_SAVE_PATH = f"{DATA_ROOT_DIR}/index_{DINO_MODEL.replace('/', '-')}.bin"
 
 STATIC_IMAGE_PATH = 'images'
 STATIC_VIDEO_PATH = 'videos'
 
-MODELS = [
+CLIP_MODELS = [
     ('ViT-L-16-SigLIP-256', 'webli'),
     ('ViT-L-14-quickgelu', 'dfn2b'),
 ]
-
-DEFAULT_MODEL = {
-    'name': MODELS[0][0],
-    'pretrained': MODELS[0][1],
+DEFAULT_CLIP_MODEL = {
+    'name': CLIP_MODELS[0][0],
+    'pretrained': CLIP_MODELS[0][1],
 }

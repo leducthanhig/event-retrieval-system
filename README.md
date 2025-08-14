@@ -4,7 +4,6 @@
 - Micromamba
 - Node.js
 - npm
-- FFmpeg
 - GNU Make (Optional, for Makefile commands)
 - Gemini API key (create and get one [here](https://aistudio.google.com/apikey))
 ## Setup
@@ -13,14 +12,14 @@
 ```bash
 pip install torch torchvision torchaudio \
     --index-url https://download.pytorch.org/whl/cu118
-pip install 'numpy<2' matplotlib pandas tensorflow \
-    ffmpeg-python pillow ftfy regex tqdm 'fastapi[standard]' \
-    open_clip_torch transformers google-genai python-dotenv
+pip install matplotlib tensorflow ffmpeg-python pillow \
+    ftfy regex tqdm "fastapi[standard]" open_clip_torch \
+    transformers google-genai python-dotenv accelerate
+micromamba install -c pytorch faiss-cpu
+micromamba install ffmpeg
 
 GIT_LFS_SKIP_SMUDGE=1 pip install git+https://github.com/soCzech/TransNetV2.git
 python backend/download-weights.py
-
-micromamba install -c pytorch faiss-cpu
 ```
 - Create a `.env` file in the `backend` directory and add your Gemini API key:
 ```
