@@ -10,7 +10,7 @@ CLIP_MODEL = 'ViT-L-16-SigLIP-256'
 CLIP_PRETRAINED = 'webli'
 CLIP_VECTOR_DATA_PATH = f"{DATA_ROOT_DIR}/vectors_{CLIP_MODEL}_{CLIP_PRETRAINED}.npy"
 
-DINO_MODEL = 'facebook/dinov2-large'
+DINO_MODEL = 'facebook/dinov3-vitl16-pretrain-lvd1689m'
 DINO_VECTOR_DATA_PATH = f"{DATA_ROOT_DIR}/vectors_{DINO_MODEL.replace('/', '-')}.npy"
 
 FAISS_PRESET = 'high_accuracy'
