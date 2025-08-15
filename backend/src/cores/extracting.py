@@ -84,15 +84,14 @@ class FeatureExtractor:
 
     @torch.no_grad()
     def extract_deep_visual_features(self,
-                                     batch_size=64,
+                                     batch_size=16,
                                      num_workers=4) -> tuple[list[np.ndarray], list[str]]:
         """Extract the deep visual features."""
         model = AutoModel.from_pretrained(self.dino_model_name, device_map=self.device)
 
         processor = AutoImageProcessor.from_pretrained(self.dino_model_name,
                                                        use_fast=True,
-                                                       return_tensors='pt',
-                                                       device=self.device)
+                                                       return_tensors='pt')
         dataset = ImageDataset(self.image_paths, processor)
         loader = DataLoader(dataset,
                             batch_size=batch_size,
@@ -103,13 +102,15 @@ class FeatureExtractor:
         all_paths = []
         progress_bar = tqdm(desc='Extracting deep visual features', total=len(dataset))
         for batch, paths in loader:
-            features = model(**batch).pooler_output
+            batch = batch.to(self.device)
+
+            features = model(pixel_values=batch).pooler_output
             features /= features.norm(dim=-1, keepdim=True)
 
             all_features.extend(features.cpu().numpy())
             all_paths.extend(paths)
 
-            progress_bar.update(batch['pixel_values'].size(0))
+            progress_bar.update(batch.size(0))
 
         progress_bar.close()
 
@@ -126,4 +127,4 @@ class FeatureExtractor:
             paths.append(path)
 
         pixel_values = torch.concat(images)
-        return {'pixel_values': pixel_values}, paths
+        return pixel_values, paths
