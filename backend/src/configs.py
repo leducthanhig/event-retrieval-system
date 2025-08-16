@@ -17,6 +17,13 @@ FAISS_PRESET = 'high_accuracy'
 CLIP_INDEX_SAVE_PATH = f"{DATA_ROOT_DIR}/index_{CLIP_MODEL}_{CLIP_PRETRAINED}.bin"
 DINO_INDEX_SAVE_PATH = f"{DATA_ROOT_DIR}/index_{DINO_MODEL.replace('/', '-')}.bin"
 
+MEDIA_INFO_DIR = 'data/media-info'
+
+DOT_ENV_FILE = 'backend/.env'
+
+ELASTIC_HOST = 'http://localhost:9200/'
+ELASTIC_INDEX_NAME = 'my-index'
+
 STATIC_IMAGE_PATH = 'images'
 STATIC_VIDEO_PATH = 'videos'
 

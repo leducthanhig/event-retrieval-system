@@ -28,10 +28,13 @@ from configs import (
     DEFAULT_CLIP_MODEL,
     DINO_MODEL,
     DINO_INDEX_SAVE_PATH,
+    DOT_ENV_FILE,
+    ELASTIC_HOST,
+    ELASTIC_INDEX_NAME,
 )
 
 # Load environment variables from the .env file
-load_dotenv('backend/.env')
+load_dotenv(DOT_ENV_FILE)
 
 # Configure logging
 logging.basicConfig(
@@ -77,6 +80,16 @@ class RewriteRequest(BaseModel):
 class RewriteResponse(BaseModel):
     rewritten_query: str
 
+class Video(BaseModel):
+    video_id: str
+    video_path: str
+    score: float
+
+class VideoResponse(BaseModel):
+    took: float
+    found: int
+    results: list[Video]
+
 class App(FastAPI):
     def __init__(self,
                  origins: list[str],
@@ -116,7 +129,10 @@ class App(FastAPI):
                                    list(model),
                                    list(pretrained),
                                    DINO_MODEL,
-                                   metadata)
+                                   metadata,
+                                   ELASTIC_HOST,
+                                   os.environ['ES_LOCAL_API_KEY'],
+                                   ELASTIC_INDEX_NAME)
 
     def load_metadata(self):
         """Loads video metadata from a JSON file."""
@@ -206,6 +222,21 @@ class App(FastAPI):
                 res['thumbnail'] = res['thumbnail'].replace(OUT_FRAME_DIR, STATIC_IMAGE_PATH)
 
             return SearchResponse(took=took, found=len(results), results=results)
+
+        @self.get('/video_search')
+        async def video_search(text_query: str, top: int = 10) -> VideoResponse:
+            start = time.time()
+
+            results = self.retriever.full_text_search(text_query, top)
+
+            final_results = []
+            for video_id, score in results:
+                path = self.metadata[video_id]['path'].replace(INP_VIDEO_DIR, STATIC_VIDEO_PATH)
+                final_results.append(Video(video_id=video_id, video_path=path, score=score))
+
+            took = time.time() - start
+
+            return VideoResponse(took=took, found=len(final_results), results=final_results)
 
         @self.get('/shots/{video_id}/{shot_id}')
         async def get_shot_timestamps(video_id: str, shot_id: str) -> ShotResponse:

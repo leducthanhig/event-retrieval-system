@@ -10,6 +10,7 @@ import faiss
 from PIL import Image
 from PIL.ImageFile import ImageFile
 from open_clip import create_model_and_transforms, get_tokenizer
+from elasticsearch import Elasticsearch
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' # to disable the warning message
 from transformers import AutoImageProcessor, AutoModel
@@ -24,13 +25,22 @@ class Retriever:
                  clip_pretrained: str | list[str],
                  dino_model_name: str,
                  metadata: list[str],
+                 elastic_host: str,
+                 elastic_api_key: str,
+                 elastic_index_name: str,
                  device='cuda' if torch.cuda.is_available() else 'cpu'):
         self.metadata = metadata
+        self.elastic_index_name = elastic_index_name
         self.device = device
 
         self.load_indices(clip_index_path, dino_index_path)
+        logger.info(f"Successfully loaded {len(self.indices)} indices")
+
         self.init_clip_model(clip_model_name, clip_pretrained)
         self.init_dino_model(dino_model_name)
+
+        self.client = Elasticsearch(elastic_host, api_key=elastic_api_key)
+        logger.info(f"Sucessfully connected to Elasticsearch cluster at {elastic_host}")
 
     def init_clip_model(self,
                         clip_model_name: str | list[str],
@@ -70,6 +80,22 @@ class Retriever:
 
         # Load DINO index
         self.load(dino_index_path)
+
+    def load(self, index_path: str):
+        """Load faiss index from disk."""
+        logger.info(f"Loading index from {index_path}")
+        index_name = os.path.splitext(os.path.basename(index_path))[0].removeprefix('index_')
+        self.indices[index_name] = faiss.read_index(index_path)
+
+        # Determine index type from loaded index
+        if isinstance(self.indices[index_name], faiss.IndexFlatL2):
+            logger.info("Loaded a Flat index")
+        elif isinstance(self.indices[index_name], faiss.IndexIVFFlat):
+            logger.info("Loaded an IVF index")
+        else:
+            logger.warning(f"Loaded index of unknown type: {type(self.indices[index_name])}")
+
+        logger.info(f"Loaded index with {self.indices[index_name].ntotal} vectors")
 
     @torch.no_grad()
     def search_by_text(self, text_query: str, model_name: str, pretrained: str, k=10):
@@ -129,21 +155,32 @@ class Retriever:
         # Normalize before returning
         return Retriever.normalize_consine_distances(results)
 
-    def load(self, index_path: str):
-        """Load faiss index from disk."""
-        logger.info(f"Loading index from {index_path}")
-        index_name = os.path.splitext(os.path.basename(index_path))[0].removeprefix('index_')
-        self.indices[index_name] = faiss.read_index(index_path)
+    def full_text_search(self, text_query: str, k=10):
+        """Search for relevant media info."""
+        # Construct the query
+        query = {
+            'query': {
+                'multi_match': {
+                    'query': text_query,
+                    'fields': ['title', 'description', 'keywords']
+                }
+            },
+            '_source': 'video_id',
+            'size': k
+        }
+        # Run search
+        response = self.client.search(index=self.elastic_index_name, body=query)
 
-        # Determine index type from loaded index
-        if isinstance(self.indices[index_name], faiss.IndexFlatL2):
-            logger.info("Loaded a Flat index")
-        elif isinstance(self.indices[index_name], faiss.IndexIVFFlat):
-            logger.info("Loaded an IVF index")
+        # Prepare results
+        results = [(doc['_source']['video_id'], doc['_score'])
+                   for doc in response['hits']['hits']]
+        if not results:
+            logger.warning("No matches found!")
         else:
-            logger.warning(f"Loaded index of unknown type: {type(self.indices[index_name])}")
+            logger.info(f"Found {len(results)} matches in {response['took'] / 1000} second(s).")
 
-        logger.info(f"Loaded index with {self.indices[index_name].ntotal} vectors")
+        # Normalize before returning
+        return Retriever.normalize_bm25_scores(results)
 
     @staticmethod
     def combine_frame_results(all_results: list[list[tuple[str, float]]],
@@ -220,16 +257,6 @@ class Retriever:
         return combined_results
 
     @staticmethod
-    def normalize_consine_distances(results: list[tuple[str, float]]) -> list[tuple[str, float]]:
-        """Normalize Consine distances from vector search results."""
-        distances = np.array([dis for _, dis in results])
-        dis_min = distances.min()
-        dis_max = distances.max()
-        dis_range = dis_max - dis_min
-        return [(path, 1 - (dis - dis_min) / dis_range)
-                for path, dis in results]
-
-    @staticmethod
     def combine_shot_results(all_results: list[list[dict]],
                              weights: list[float]) -> list[dict]:
         """Combine shot-level results."""
@@ -269,3 +296,23 @@ class Retriever:
         combined_results.sort(key=lambda x: x['score'], reverse=True)
 
         return combined_results
+
+    @staticmethod
+    def normalize_consine_distances(results: list[tuple[str, float]]) -> list[tuple[str, float]]:
+        """Normalize Consine distances from vector search results."""
+        distances = np.array([dis for _, dis in results])
+        dis_min = distances.min()
+        dis_max = distances.max()
+        dis_range = dis_max - dis_min
+        return [(path, 1 - (dis - dis_min) / dis_range)
+                for path, dis in results]
+
+    @staticmethod
+    def normalize_bm25_scores(results: list[tuple[str, float]]) -> list[tuple[str, float]]:
+        """Normalize BM25 scores from full-text search results."""
+        scores = np.array([score for _, score in results])
+        score_min = scores.min()
+        score_max = scores.max()
+        score_range = score_max - score_min
+        return [(path, (score - score_min) / score_range)
+                for path, score in results]

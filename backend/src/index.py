@@ -1,8 +1,11 @@
+import os
+import json
 import logging
 
 import numpy as np
+from dotenv import load_dotenv
 
-from cores.indexing import VectorIndexer
+from cores.indexing import VectorIndexer, TextIndexer
 
 from configs import (
     CLIP_VECTOR_DATA_PATH,
@@ -10,7 +13,14 @@ from configs import (
     CLIP_INDEX_SAVE_PATH,
     DINO_INDEX_SAVE_PATH,
     FAISS_PRESET,
+    MEDIA_INFO_DIR,
+    DOT_ENV_FILE,
+    ELASTIC_HOST,
+    ELASTIC_INDEX_NAME,
 )
+
+# Load environment variables from the .env file
+load_dotenv(DOT_ENV_FILE)
 
 # Configure logging
 logging.basicConfig(
@@ -19,6 +29,7 @@ logging.basicConfig(
 )
 
 if __name__ == '__main__':
+    # Index vectors
     data_paths = [
         CLIP_VECTOR_DATA_PATH,
         DINO_VECTOR_DATA_PATH,
@@ -34,3 +45,36 @@ if __name__ == '__main__':
         # Index features
         vec_indexer = VectorIndexer(FAISS_PRESET)
         vec_indexer.create_index(vector_data, save_path)
+
+    # Index media info
+    fields = ['title', 'description', 'keywords', 'publish_date']
+    docs = []
+    for file in os.listdir(MEDIA_INFO_DIR):
+        with open(os.path.join(MEDIA_INFO_DIR, file), encoding='utf-8') as f:
+            info = json.load(f)
+        video_id = os.path.splitext(file)[0]
+        docs.append({'video_id': video_id} | {key: info[key] for key in fields})
+
+    mapping = {
+        'properties': {
+            'video_id': {
+                'type': 'keyword',
+                'index': 'false'
+            },
+            'title': {
+                'type': 'text'
+            },
+            'description': {
+                'type': 'text'
+            },
+            'keywords': {
+                'type': 'keyword'
+            },
+            'publish_date': {
+                'type': 'date',
+                'format': 'dd/MM/yyyy'
+            }
+        }
+    }
+    es_indexer = TextIndexer(ELASTIC_HOST, api_key=os.environ['ES_LOCAL_API_KEY'])
+    es_indexer.create_index(ELASTIC_INDEX_NAME, docs, mapping)
