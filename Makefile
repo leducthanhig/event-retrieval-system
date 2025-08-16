@@ -4,7 +4,8 @@ setup:
 		--index-url https://download.pytorch.org/whl/cu118
 	pip install matplotlib tensorflow ffmpeg-python pillow \
 		ftfy regex tqdm "fastapi[standard]" open_clip_torch \
-		transformers google-genai python-dotenv accelerate
+		google-genai python-dotenv accelerate \
+		git+https://github.com/huggingface/transformers.git
 	micromamba install -c pytorch faiss-cpu
 	micromamba install ffmpeg
 
