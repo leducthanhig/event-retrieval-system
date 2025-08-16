@@ -3,15 +3,15 @@ import time
 import logging
 import json
 from typing import Literal
-from collections import defaultdict
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Form, UploadFile, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from PIL import Image
 
 from cores.retrieving import Retriever
 from utils import get_avg_fps
@@ -47,7 +47,9 @@ class SearchModel(BaseModel):
 
 class SearchBody(BaseModel):
     models: SearchModel | list[SearchModel] = SearchModel(**DEFAULT_CLIP_MODEL)
+    clip_weights: list[float] | None = None
     weights: list[float] | None = None
+    image_query: UploadFile | None = None
     pooling_method: Literal['avg', 'max'] = 'max'
 
 class Shot(BaseModel):
@@ -90,7 +92,7 @@ class App(FastAPI):
             allow_headers=["*"],
         )
 
-        self.init_retrievers()
+        self.init_retriever()
         self.load_metadata()
         self.mount_dirs(mount_paths)
         self.init_routes()
@@ -102,19 +104,19 @@ class App(FastAPI):
         for path, dir in mount_paths:
             self.mount(path, StaticFiles(directory=dir), name=os.path.basename(path))
 
-    def init_retrievers(self):
-        """Initializes retrievers for each model and pretrained weights."""
-        self.retrievers: defaultdict[str, defaultdict[str, Retriever]] = defaultdict(defaultdict)
-        for model, pretrained in CLIP_MODELS:
-            clip_index_path = os.path.join(DATA_ROOT_DIR, f"index_{model}_{pretrained}.bin")
-            with open(PROCESSED_FRAME_DATA_PATH) as f:
-                metadata = json.load(f)
-            self.retrievers[pretrained][model] = Retriever(clip_index_path,
-                                                           DINO_INDEX_SAVE_PATH,
-                                                           metadata,
-                                                           model,
-                                                           pretrained,
-                                                           DINO_MODEL)
+    def init_retriever(self):
+        """Initializes retriever."""
+        clip_index_path = [os.path.join(DATA_ROOT_DIR, f"index_{m}_{p}.bin")
+                           for m, p in CLIP_MODELS]
+        model, pretrained = zip(*CLIP_MODELS)
+        with open(PROCESSED_FRAME_DATA_PATH) as f:
+            metadata = json.load(f)
+        self.retriever = Retriever(clip_index_path,
+                                   DINO_INDEX_SAVE_PATH,
+                                   list(model),
+                                   list(pretrained),
+                                   DINO_MODEL,
+                                   metadata)
 
     def load_metadata(self):
         """Loads video metadata from a JSON file."""
@@ -124,7 +126,10 @@ class App(FastAPI):
     def init_routes(self):
         """Initializes API routes for the application."""
         @self.post("/search")
-        async def search(q: str, body: SearchBody, top: int = 10) -> SearchResponse:
+        async def search(
+            q: str,
+            body: SearchBody = Depends(App.parse_search_body),
+            top: int = 10) -> SearchResponse:
             """Searches for relevant video shots based on the query."""
             models = body.models
             if not isinstance(models, list):
@@ -144,22 +149,45 @@ class App(FastAPI):
             # Perform search
             start = time.time()
             all_results = []
+
+            # Search by text
+            all_clip_results = []
             for model in models:
-                retriever = self.retrievers[model.pretrained][model.name]
+                all_clip_results.append(self.retriever.search_by_text(q,
+                                                                      model.name,
+                                                                      model.pretrained,
+                                                                      top))
+
+            if len(all_clip_results) > 1:
                 all_results.append(
-                    retriever.search(q, pooling_method=body.pooling_method, k=top*2))
-            if len(all_results) > 1:
-                results = Retriever.combine_results(all_results, body.weights)
+                    Retriever.combine_frame_results(all_clip_results, body.clip_weights))
             else:
-                results = all_results[0]
+                all_results.append(all_clip_results[0])
+
+            # Search by image
+            if body.image_query:
+                image_query = Image.open(body.image_query.file)
+                index_name = os.path.splitext(
+                    os.path.basename(DINO_INDEX_SAVE_PATH))[0].removeprefix('index_')
+                all_results.append(self.retriever.search_by_image(image_query, index_name, top))
+
+            # Combine frames
+            all_combined_results = [Retriever.combine_frames(results, body.pooling_method)
+                                    for results in all_results]
+
+            # Combine results if needed
+            if len(all_combined_results) > 1:
+                final_results = Retriever.combine_shot_results(all_combined_results, body.weights)
+            else:
+                final_results = all_combined_results[0]
+
             took = time.time() - start
 
             # Post-process file paths
-            for res in results:
+            for res in final_results:
                 res['thumbnail'] = res['thumbnail'].replace(OUT_FRAME_DIR, STATIC_IMAGE_PATH)
 
-            found = min(len(results), top)
-            return SearchResponse(took=took, found=found, results=results[:found])
+            return SearchResponse(took=took, found=len(final_results), results=final_results)
 
         @self.get('/shots/{video_id}/{shot_id}')
         async def get_shot_timestamps(video_id: str, shot_id: str) -> ShotResponse:
@@ -224,6 +252,33 @@ class App(FastAPI):
                     rewritten = part.text.split("Rewritten query:")[1].strip()
 
             return RewriteResponse(rewritten_query=rewritten)
+
+    @staticmethod
+    async def parse_search_body(
+        models: str = Form(...),
+        clip_weights: str | None = Form(None),
+        weights: str | None = Form(None),
+        pooling_method: Literal['avg', 'max'] = Form('max'),
+        image_query: UploadFile | None = None,
+    ) -> SearchBody:
+        """Parses form data and reconstructs the SearchBody model."""
+        models_parsed = json.loads(models)
+        clip_weights_parsed = json.loads(clip_weights) if clip_weights else None
+        weights_parsed = json.loads(weights) if weights else None
+
+        # Convert models to SearchModel objects
+        if isinstance(models_parsed, list):
+            models_obj = [SearchModel(**m) if isinstance(m, dict) else m for m in models_parsed]
+        else:
+            models_obj = [SearchModel(**models_parsed) if isinstance(models_parsed, dict) else models_parsed]
+
+        return SearchBody(
+            models=models_obj,
+            clip_weights=clip_weights_parsed,
+            weights=weights_parsed,
+            image_query=image_query,
+            pooling_method=pooling_method
+        )
 
 origins = [
     "http://localhost:5173",

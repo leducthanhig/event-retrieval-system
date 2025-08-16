@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import faiss
 from PIL import Image
+from PIL.ImageFile import ImageFile
 from open_clip import create_model_and_transforms, get_tokenizer
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' # to disable the warning message
@@ -17,56 +18,86 @@ logger = logging.getLogger(__name__)
 
 class Retriever:
     def __init__(self,
-                 clip_index_path: str,
+                 clip_index_path: str | list[str],
                  dino_index_path: str,
-                 metadata: list[str],
-                 clip_model_name: str,
-                 clip_pretrained: str,
+                 clip_model_name: str | list[str],
+                 clip_pretrained: str | list[str],
                  dino_model_name: str,
+                 metadata: list[str],
                  device='cuda' if torch.cuda.is_available() else 'cpu'):
         self.metadata = metadata
         self.device = device
 
-        # Init CLIP model and tokenizer
-        self.clip_model, _, self.clip_transforms = create_model_and_transforms(clip_model_name,
-                                                                               clip_pretrained,
-                                                                               device=device)
-        self.tokenizer = get_tokenizer(clip_model_name)
+        self.load_indices(clip_index_path, dino_index_path)
+        self.init_clip_model(clip_model_name, clip_pretrained)
+        self.init_dino_model(dino_model_name)
 
-        # Init DINO model and processor
-        self.dino_model = AutoModel.from_pretrained(dino_model_name, device_map=device)
-        self.dino_processor = AutoImageProcessor.from_pretrained(dino_model_name,
+    def init_clip_model(self,
+                        clip_model_name: str | list[str],
+                        clip_pretrained: str | list[str]):
+        """Initialize CLIP model(s) and tokenizer(s)."""
+        if isinstance(clip_model_name, str):
+            clip_model_name = [clip_model_name]
+        if isinstance(clip_pretrained, str):
+            clip_pretrained = [clip_pretrained]
+
+        self.clip_model = defaultdict(defaultdict)
+        for model_name, pretrained in zip(clip_model_name, clip_pretrained):
+            model, _, _ = create_model_and_transforms(model_name,
+                                                      pretrained,
+                                                      device=self.device)
+            tokenizer = get_tokenizer(model_name)
+            self.clip_model[pretrained][model_name] = dict(encoder=model.encode_text,
+                                                           tokenizer=tokenizer)
+
+    def init_dino_model(self, model_name: str):
+        """Initialize DINO model."""
+        self.dino_model = AutoModel.from_pretrained(model_name, device_map=self.device)
+        self.dino_processor = AutoImageProcessor.from_pretrained(model_name,
                                                                  use_fast=True,
                                                                  return_tensors='pt',
-                                                                 device=device)
+                                                                 device=self.device)
 
-        # Load indices
+    def load_indices(self, clip_index_path: str | list[str], dino_index_path: str):
+        """Load all indices from disk."""
         self.indices = dict()
-        self.load(clip_index_path, 'clip')
-        self.load(dino_index_path, 'dino')
+
+        # Load CLIP indices
+        if isinstance(clip_index_path, str):
+            clip_index_path = [clip_index_path]
+        for path in clip_index_path:
+            self.load(path)
+
+        # Load DINO index
+        self.load(dino_index_path)
 
     @torch.no_grad()
-    def search_by_text(self, text_query: str, k=10):
+    def search_by_text(self, text_query: str, model_name: str, pretrained: str, k=10):
         """Search for relevant images to the text query."""
-        tokenized_text = self.tokenizer([text_query]).to(self.device)
-        features = self.clip_model.encode_text(tokenized_text)
+        model = self.clip_model[pretrained][model_name]
+        tokenized_text = model['tokenizer']([text_query]).to(self.device)
+        features = model['encoder'](tokenized_text)
         features /= features.norm(dim=-1, keepdim=True)
         features = features.cpu().numpy()
-        return self.vector_search(features, 'clip', k)
+        return self.vector_search(features, f"{model_name}_{pretrained}", k)
 
     @torch.no_grad()
-    def search_by_image(self, image_query_path: str, k=10):
+    def search_by_image(self, image_query: str | ImageFile, index_name: str, k=10):
         """Search for relevant images to the image query."""
-        image = Image.open(image_query_path)
+        if isinstance(image_query, str):
+            image = Image.open(image_query)
+        else:
+            image = image_query
+
         processed_image = self.dino_processor(image)
-        features = self.dino_model(**processed_image)
+        features = self.dino_model(**processed_image).pooler_output
         features /= features.norm(dim=-1, keepdim=True)
         features = features.cpu().numpy()
-        return self.vector_search(features, 'dino', k)
+        return self.vector_search(features, index_name, k)
 
     def vector_search(self,
                       query_vector: np.ndarray,
-                      index_name: str = 'clip',
+                      index_name: str,
                       k=10,
                       nprobe: int | None = None):
         """Search for relevant images."""
@@ -98,37 +129,10 @@ class Retriever:
         # Normalize before returning
         return Retriever.normalize_consine_distances(results)
 
-    def search(self,
-               text_query: str,
-               image_query_path: str | None = None,
-               weights: list[float] | None = None,
-               pooling_method: Literal['avg', 'max'] = 'max',
-               k=10):
-        """Perform multimodal search for all given queries."""
-        # Perform the primary text search
-        all_results = [self.search_by_text(text_query, k)]
-
-        # Perform other searches if provided
-        if image_query_path:
-            all_results.append(self.search_by_image(image_query_path, k))
-
-        # Combine results if needed
-        if len(all_results) == 1:
-            final_results = all_results[0]
-        else:
-            if not weights:
-                msg = "Multiple queries were given but no weights are specified."
-                logger.error(msg)
-                raise RuntimeError(msg)
-
-            final_results = self.combine_modalities_results(all_results, weights)
-
-        # Combine frames and return
-        return self.combine_frames(final_results, pooling_method)
-
-    def load(self, index_path: str, index_name: str):
+    def load(self, index_path: str):
         """Load faiss index from disk."""
         logger.info(f"Loading index from {index_path}")
+        index_name = os.path.splitext(os.path.basename(index_path))[0].removeprefix('index_')
         self.indices[index_name] = faiss.read_index(index_path)
 
         # Determine index type from loaded index
@@ -142,16 +146,16 @@ class Retriever:
         logger.info(f"Loaded index with {self.indices[index_name].ntotal} vectors")
 
     @staticmethod
-    def combine_modalities_results(all_modal_results: list[list[tuple[str, float]]],
-                                   weights: list[float]) -> list[tuple[str, float]]:
-        """Combine results from all modalities."""
-        if len(all_modal_results) != len(weights):
-            msg = "Mismatched between the number of modal results and weights"
+    def combine_frame_results(all_results: list[list[tuple[str, float]]],
+                              weights: list[float]) -> list[tuple[str, float]]:
+        """Combine frame-level results."""
+        if len(all_results) != len(weights):
+            msg = "Mismatched between the number of result set and weights"
             logger.error(msg)
             raise RuntimeError(msg)
 
         # Convert lists to dictionaries for efficient lookups
-        dicts = [defaultdict(float, results) for results in all_modal_results]
+        dicts = [defaultdict(float, results) for results in all_results]
 
         # Get the union of keys from all dictionaries
         all_keys = set()
@@ -226,9 +230,9 @@ class Retriever:
                 for path, dis in results]
 
     @staticmethod
-    def combine_results(all_results: list[list[dict]],
-                        weights: list[float]) -> list[dict]:
-        """Combine the results from multi-model search by the given weights."""
+    def combine_shot_results(all_results: list[list[dict]],
+                             weights: list[float]) -> list[dict]:
+        """Combine shot-level results."""
         # Group results
         grouped_results = defaultdict(lambda: defaultdict())
         for results in all_results:
