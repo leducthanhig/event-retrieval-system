@@ -2,9 +2,9 @@ import os
 import time
 import logging
 import json
-from typing import Literal
+from typing import Literal, Annotated
 
-from fastapi import FastAPI, Form, UploadFile, Depends
+from fastapi import FastAPI, Form, UploadFile, Depends, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -188,6 +188,24 @@ class App(FastAPI):
                 res['thumbnail'] = res['thumbnail'].replace(OUT_FRAME_DIR, STATIC_IMAGE_PATH)
 
             return SearchResponse(took=took, found=len(final_results), results=final_results)
+
+        @self.post('/similar_search')
+        async def similar_search(image_query: Annotated[UploadFile, File()],
+                                 top: int = 10) -> SearchResponse:
+            image_query = Image.open(image_query.file)
+            index_name = os.path.splitext(
+                os.path.basename(DINO_INDEX_SAVE_PATH))[0].removeprefix('index_')
+
+            start = time.time()
+            results = Retriever.combine_frames(
+                self.retriever.search_by_image(image_query, index_name, top))
+            took = time.time() - start
+
+            # Post-process file paths
+            for res in results:
+                res['thumbnail'] = res['thumbnail'].replace(OUT_FRAME_DIR, STATIC_IMAGE_PATH)
+
+            return SearchResponse(took=took, found=len(results), results=results)
 
         @self.get('/shots/{video_id}/{shot_id}')
         async def get_shot_timestamps(video_id: str, shot_id: str) -> ShotResponse:
