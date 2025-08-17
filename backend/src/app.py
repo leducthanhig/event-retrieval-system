@@ -4,7 +4,7 @@ import logging
 import json
 from typing import Literal, Annotated
 
-from fastapi import FastAPI, Form, UploadFile, Depends, File
+from fastapi import FastAPI, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -50,10 +50,7 @@ class SearchModel(BaseModel):
 
 class SearchBody(BaseModel):
     models: SearchModel | list[SearchModel] = SearchModel(**DEFAULT_CLIP_MODEL)
-    clip_weights: list[float] | None = None
     weights: list[float] | None = None
-    image_query: UploadFile | None = None
-    pooling_method: Literal['avg', 'max'] = 'max'
 
 class Shot(BaseModel):
     video_id: str
@@ -142,10 +139,10 @@ class App(FastAPI):
     def init_routes(self):
         """Initializes API routes for the application."""
         @self.post("/search")
-        async def search(
-            q: str,
-            body: SearchBody = Depends(App.parse_search_body),
-            top: int = 10) -> SearchResponse:
+        async def search(q: str,
+                         body: SearchBody,
+                         top: int = 10,
+                         pooling_method: Literal['avg', 'max'] = 'max') -> SearchResponse:
             """Searches for relevant video shots based on the query."""
             models = body.models
             if not isinstance(models, list):
@@ -164,38 +161,21 @@ class App(FastAPI):
 
             # Perform search
             start = time.time()
+
             all_results = []
-
-            # Search by text
-            all_clip_results = []
+            # Perform search for each model
             for model in models:
-                all_clip_results.append(self.retriever.search_by_text(q,
-                                                                      model.name,
-                                                                      model.pretrained,
-                                                                      top))
-
-            if len(all_clip_results) > 1:
                 all_results.append(
-                    Retriever.combine_frame_results(all_clip_results, body.clip_weights))
-            else:
-                all_results.append(all_clip_results[0])
+                    self.retriever.search_by_text(q, model.name, model.pretrained, top))
 
-            # Search by image
-            if body.image_query:
-                image_query = Image.open(body.image_query.file)
-                index_name = os.path.splitext(
-                    os.path.basename(DINO_INDEX_SAVE_PATH))[0].removeprefix('index_')
-                all_results.append(self.retriever.search_by_image(image_query, index_name, top))
+            # Fuse results if needed
+            if len(all_results) > 1:
+                results = Retriever.combine_frame_results(all_results, body.clip_weights)
+            else:
+                results = all_results[0]
 
             # Combine frames
-            all_combined_results = [Retriever.combine_frames(results, body.pooling_method)
-                                    for results in all_results]
-
-            # Combine results if needed
-            if len(all_combined_results) > 1:
-                final_results = Retriever.combine_shot_results(all_combined_results, body.weights)
-            else:
-                final_results = all_combined_results[0]
+            final_results = Retriever.combine_frames(results, pooling_method)
 
             took = time.time() - start
 
@@ -207,14 +187,15 @@ class App(FastAPI):
 
         @self.post('/similar_search')
         async def similar_search(image_query: Annotated[UploadFile, File()],
-                                 top: int = 10) -> SearchResponse:
+                                 top: int = 10,
+                                 pooling_method: Literal['avg', 'max'] = 'max') -> SearchResponse:
             image_query = Image.open(image_query.file)
             index_name = os.path.splitext(
                 os.path.basename(DINO_INDEX_SAVE_PATH))[0].removeprefix('index_')
 
             start = time.time()
             results = Retriever.combine_frames(
-                self.retriever.search_by_image(image_query, index_name, top))
+                self.retriever.search_by_image(image_query, index_name, top), pooling_method)
             took = time.time() - start
 
             # Post-process file paths
@@ -301,33 +282,6 @@ class App(FastAPI):
                     rewritten = part.text.split("Rewritten query:")[1].strip()
 
             return RewriteResponse(rewritten_query=rewritten)
-
-    @staticmethod
-    async def parse_search_body(
-        models: str = Form(...),
-        clip_weights: str | None = Form(None),
-        weights: str | None = Form(None),
-        pooling_method: Literal['avg', 'max'] = Form('max'),
-        image_query: UploadFile | None = None,
-    ) -> SearchBody:
-        """Parses form data and reconstructs the SearchBody model."""
-        models_parsed = json.loads(models)
-        clip_weights_parsed = json.loads(clip_weights) if clip_weights else None
-        weights_parsed = json.loads(weights) if weights else None
-
-        # Convert models to SearchModel objects
-        if isinstance(models_parsed, list):
-            models_obj = [SearchModel(**m) if isinstance(m, dict) else m for m in models_parsed]
-        else:
-            models_obj = [SearchModel(**models_parsed) if isinstance(models_parsed, dict) else models_parsed]
-
-        return SearchBody(
-            models=models_obj,
-            clip_weights=clip_weights_parsed,
-            weights=weights_parsed,
-            image_query=image_query,
-            pooling_method=pooling_method
-        )
 
 origins = [
     "http://localhost:5173",
