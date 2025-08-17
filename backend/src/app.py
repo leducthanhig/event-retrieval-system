@@ -170,7 +170,7 @@ class App(FastAPI):
 
             # Fuse results if needed
             if len(all_results) > 1:
-                results = Retriever.combine_frame_results(all_results, body.clip_weights)
+                results = Retriever.combine_frame_results(all_results, body.weights)
             else:
                 results = all_results[0]
 
