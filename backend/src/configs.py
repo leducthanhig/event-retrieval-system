@@ -28,6 +28,7 @@ STATIC_IMAGE_PATH = 'images'
 STATIC_VIDEO_PATH = 'videos'
 
 CLIP_MODELS = [
+    ('ViT-B-16-SigLIP2-384', 'webli'),
     ('ViT-L-16-SigLIP-256', 'webli'),
     ('ViT-L-14-quickgelu', 'dfn2b'),
 ]
