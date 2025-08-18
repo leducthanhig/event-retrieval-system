@@ -27,10 +27,12 @@ class Retriever:
                  metadata: list[str],
                  elastic_host: str,
                  elastic_api_key: str,
-                 elastic_index_name: str,
+                 media_info_index_name: str,
+                 transcriptions_index_name: str,
                  device='cuda' if torch.cuda.is_available() else 'cpu'):
         self.metadata = metadata
-        self.elastic_index_name = elastic_index_name
+        self.media_info_index_name = media_info_index_name
+        self.transcriptions_index_name = transcriptions_index_name
         self.device = device
 
         self.load_indices(clip_index_path, dino_index_path)
@@ -57,7 +59,28 @@ class Retriever:
                                                       pretrained,
                                                       device=self.device)
             tokenizer = get_tokenizer(model_name)
-            self.clip_model[pretrained][model_name] = dict(encoder=model.encode_text,
+            # keep the bound encoder callable (uses the text submodule)
+            encoder = model.encode_text
+
+            # drop the visual tower to free RAM
+            if hasattr(model, 'visual'):
+                try:
+                    del model.visual
+                    logger.info('Dropped the visual tower to free RAM')
+                except Exception:
+                    pass
+
+            # help Python / CUDA free memory
+            import gc
+            gc.collect()
+            if self.device != 'cpu':
+                try:
+                    torch.cuda.empty_cache()
+                    logger.info('Cleared CUDA cache')
+                except Exception:
+                    pass
+
+            self.clip_model[pretrained][model_name] = dict(encoder=encoder,
                                                            tokenizer=tokenizer)
 
     def init_dino_model(self, model_name: str):
@@ -126,7 +149,7 @@ class Retriever:
                       index_name: str,
                       k=10,
                       nprobe: int | None = None):
-        """Search for relevant images."""
+        """Perform vector search on Faiss index."""
         if index_name not in self.indices:
             msg = f"Index '{index_name}' not found in loaded indices."
             logger.error(msg)
@@ -155,24 +178,48 @@ class Retriever:
         # Normalize before returning
         return Retriever.normalize_consine_distances(results)
 
-    def full_text_search(self, text_query: str, k=10):
+    def media_info_search(self, text_query: str, k=10) -> list[tuple[str, float]]:
         """Search for relevant media info."""
-        # Construct the query
         query = {
-            'query': {
-                'multi_match': {
-                    'query': text_query,
-                    'fields': ['title', 'description', 'keywords']
-                }
+            'multi_match': {
+                'query': text_query,
+                'fields': ['title', 'description', 'keywords'],
             },
-            '_source': 'video_id',
-            'size': k
         }
+        results = self.full_text_search(query, self.media_info_index_name, 'video_id', k)
+        return [(res[0]['video_id'], res[1]) for res in results]
+
+    def transcription_search(self, text_query: str, k=10):
+        """Search for relevant transcriptions."""
+        query = {
+            'match': {
+                'text': {
+                    'query': text_query,
+                },
+            },
+        }
+        return self.full_text_search(query, self.transcriptions_index_name, ['id', 'video_id'], k)
+
+    def full_text_search(self,
+                         query: dict,
+                         index_name: str,
+                         return_fields: str | list[str] | None = None,
+                         k=10):
+        """Perform full-text search on Elasticsearch index."""
+        # Construct the query body
+        body = {
+            'query': query,
+            'size': k,
+        }
+
+        if return_fields:
+            body['_source'] = return_fields
+
         # Run search
-        response = self.client.search(index=self.elastic_index_name, body=query)
+        response = self.client.search(index=index_name, body=body)
 
         # Prepare results
-        results = [(doc['_source']['video_id'], doc['_score'])
+        results = [(doc['_source'], doc['_score'])
                    for doc in response['hits']['hits']]
         if not results:
             logger.warning("No matches found!")
@@ -308,7 +355,7 @@ class Retriever:
                 for path, dis in results]
 
     @staticmethod
-    def normalize_bm25_scores(results: list[tuple[str, float]]) -> list[tuple[str, float]]:
+    def normalize_bm25_scores(results: list[tuple[dict, float]]) -> list[tuple[dict, float]]:
         """Normalize BM25 scores from full-text search results."""
         scores = np.array([score for _, score in results])
         score_min = scores.min()

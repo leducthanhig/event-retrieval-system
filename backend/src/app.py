@@ -30,7 +30,8 @@ from configs import (
     DINO_INDEX_SAVE_PATH,
     DOT_ENV_FILE,
     ELASTIC_HOST,
-    ELASTIC_INDEX_NAME,
+    MEDIA_INFO_INDEX_NAME,
+    TRANSCRIPTION_INDEX_NAME,
 )
 
 # Load environment variables from the .env file
@@ -129,7 +130,8 @@ class App(FastAPI):
                                    metadata,
                                    ELASTIC_HOST,
                                    os.environ['ES_LOCAL_API_KEY'],
-                                   ELASTIC_INDEX_NAME)
+                                   MEDIA_INFO_INDEX_NAME,
+                                   TRANSCRIPTION_INDEX_NAME)
 
     def load_metadata(self):
         """Loads video metadata from a JSON file."""
@@ -208,7 +210,7 @@ class App(FastAPI):
         async def video_search(text_query: str, top: int = 10) -> VideoResponse:
             start = time.time()
 
-            results = self.retriever.full_text_search(text_query, top)
+            results = self.retriever.media_info_search(text_query, top)
 
             final_results = []
             for video_id, score in results:
@@ -218,6 +220,34 @@ class App(FastAPI):
             took = time.time() - start
 
             return VideoResponse(took=took, found=len(final_results), results=final_results)
+
+        @self.get('/transcription_search')
+        async def transcription_search(text_query: str, top: int = 10) -> SearchResponse:
+            start = time.time()
+
+            results = self.retriever.transcription_search(text_query, top)
+
+            final_results = []
+            for info, score in results:
+                video_id = info['video_id']
+                shot_id = f"S{info['id']:05}"
+                frame_dir = os.path.join(OUT_FRAME_DIR, 'Videos_L25', 'video', video_id, shot_id)
+                frames = os.listdir(frame_dir)
+                selected_frame = [frame for frame in frames
+                                  if os.path.splitext(frame)[0].endswith('_selected')]
+                if selected_frame:
+                    thumbnail = os.path.join(frame_dir, selected_frame[0])
+                    thumbnail = thumbnail.replace(OUT_FRAME_DIR, STATIC_IMAGE_PATH)
+                else:
+                    thumbnail = ''
+                final_results.append(Shot(video_id=video_id,
+                                          shot_id=shot_id,
+                                          thumbnail=thumbnail,
+                                          score=score))
+
+            took = time.time() - start
+
+            return SearchResponse(took=took, found=len(final_results), results=final_results)
 
         @self.get('/shots/{video_id}/{shot_id}')
         async def get_shot_timestamps(video_id: str, shot_id: str) -> ShotResponse:
