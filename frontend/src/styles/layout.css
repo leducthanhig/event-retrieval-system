@@ -1,0 +1,136 @@
+  /* Default alignment */
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  .ner-root {
+    display: grid;
+    grid-template-columns: 300px calc(100% - 300px);
+    column-gap: 1px;
+    height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: hidden;
+  }
+
+  .ner-sidebar,
+  .ner-results {
+    min-width: 0;
+    min-height: 0; 
+  }
+
+  .ner-sidebar {
+    border-right: none;
+    padding: 0;
+    position: relative;
+    top: 0;
+    max-height: 100vh;
+    overflow-y: auto; 
+    overflow-x: hidden;
+    background: #1e1e1e;
+  }
+  
+  .sidebar-scroll {
+    max-height: 100vh;        /* giới hạn theo viewport */
+    overflow-y: auto;         /* bật thanh cuộn dọc khi cần */
+    overflow-x: hidden;       /* không cho scroll ngang */
+    scrollbar-gutter: stable; /* chống layout shift khi hiện/ẩn scrollbar */
+  }
+
+  .ner-results {
+    overflow: hidden;
+    height: 100vh;
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Inner scroller:*/
+  .results-scroll {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px;
+    scrollbar-gutter: stable ;
+    padding-right: 2px; 
+  }
+
+  /* Grid for keyframes */
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+/* Result card styles */
+.result-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9; /* keep consistent thumbnail ratio */
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.result-card button {
+  max-width: 100%;
+}
+
+.query-textarea { scrollbar-width: thin; }
+.query-textarea::-webkit-scrollbar { width: 6px; }
+.query-textarea { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.query-textarea::-webkit-scrollbar { width: 6px; }
+.query-textarea::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+
+.ner-btn {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  min-width: 90px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background-color: #1a1a1a;
+  color: white;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+
+.ner-btn:hover {
+  border-color: #646cff;
+}
+
+.ner-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.action-btn {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: transparent;
+}
+
+.result-card .action-btn:focus,
+.result-card .action-btn:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
+.result-card .action-btn:hover {
+  border-color: #646cff !important;
+}

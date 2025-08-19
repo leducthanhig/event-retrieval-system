@@ -1,180 +1,224 @@
 import { useState } from 'react';
-import SearchBar from './components/SearchBar';
-import ModelSelector from './components/ModelSelector';
-import SearchResult from './components/SearchResult';
-import VideoPlayer from './components/VideoPlayer';
-import './App.css';
+import Home from './pages/Home';
+import './styles/layout.css';
+import useSearch from './hooks/useSearch';
 
-const AVAILABLE_MODELS = [
-  { label: 'ViT-L-16-SigLIP-256', model_name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
-  { label: 'ViT-L-14-quickgelu', model_name: 'ViT-L-14-quickgelu', pretrained: 'dfn2b' }
-];
-
-function toAPISearchModel(uiModel) {
-  return {
-    name: uiModel.model_name,
-    pretrained: uiModel.pretrained,
-  };
-}
-
-function App() {
+export default function App() {
+  // Core search states
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
-  const [error, setError] = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
-  const [selected, setSelected] = useState(null);
+  const [selectedModels, setSelectedModels] = useState(['siglip2']);
+  const [weights, setWeights] = useState({ siglip2: '1.0', siglip: '0.0', quickgelu: '0.0' });
 
-  const [mode, setMode] = useState('single'); // 'single' or 'multi'
-  const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0]);
-  const [weights, setWeights] = useState(['0.5', '0.5']); // as string
-
+  // Search control states
   const [isSearching, setIsSearching] = useState(false);
   const [isRewriting, setIsRewriting] = useState(false);
 
-  const handleSearch = async () => {
-    setError('');
-    setHasSearched(true);
+  // Results & selection
+  const [results, setResults] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null); // for preview modal/video
 
-    // Ignore empty query
-    if (!query.trim()) {
+  // API hooks
+  const { search, rewrite, loading, error, setError } = useSearch({
+    onResults: (items) => setResults(items || []),
+  });
+
+  const handleSearch = async () => {
+    // Validate query
+    const q = query.trim();
+    if (!q) {
       setError('Please enter a query.');
       return;
     }
 
-    // Validate input
-    if (mode === 'single' && !selectedModel) {
-      setError('Please select a model.');
-      return;
+    const n = selectedModels.length;
+    if (n === 0) { 
+      setError('Please select at least one model.'); 
+      return; 
     }
-    if (mode === 'multi') {
-      const w1 = parseFloat(weights[0]);
-      const w2 = parseFloat(weights[1]);
-      if (isNaN(w1) || isNaN(w2)) {
-        setError('Please enter valid weights.');
-        return;
+
+    // Validate weights in multi-model mode
+    if (n >= 2) {
+      const ws = selectedModels.map(k => parseFloat(weights[k]));
+      if (ws.some(x => Number.isNaN(x))) { 
+        setError('Please enter valid decimal weights.'); 
+        return; 
+      }
+      const sum = ws.reduce((a,b) => a + b, 0);
+      const roundedSum = Math.round(sum * 10) / 10;
+      if (roundedSum !== 1.0) { 
+        setError('Weights must sum exactly to 1.'); 
+        return; 
       }
     }
 
+    // map UI keys -> backend models
+    const MODEL_MAP = {
+      siglip2:   { name: 'ViT-B-16-SigLIP2-384', pretrained: 'webli' },
+      siglip:    { name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
+      quickgelu: { name: 'ViT-L-14-quickgelu',  pretrained: 'dfn2b'  },
+    };
+
+    setError('');
     setIsSearching(true);
 
     try {
-      let body = { pooling_method: 'max' };
-
-      if (mode === 'single') {
-        if (!selectedModel) {
-          setError("Please select a model.");
-          return;
-        }
-        body.models = [toAPISearchModel(selectedModel)];
+      let body;
+      if (n === 1) {
+        body = {
+          models: MODEL_MAP[selectedModels[0]],
+        };
       } else {
-        body.models = [
-          { name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
-          { name: 'ViT-L-14-quickgelu', pretrained: 'dfn2b' }
-        ];
-        body.weights = weights.map((w) => parseFloat(w));
+        const models = selectedModels.map(k => MODEL_MAP[k]);
+        const ws = selectedModels.map(k => Number(weights[k]));
+        body = {
+          models,
+          weights: ws,
+        };
       }
 
-      const response = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(query)}&top=100`, {
+      // Build URL with query params (q, top, pooling_method)
+      const url = `http://localhost:8000/search?q=${encodeURIComponent(q)}&top=100`;
+
+      // Call API
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
 
-      if (!response.ok) throw new Error(`Failed to fetch (${response.status})`);
+      if (!response.ok) {
+        throw new Error(`Search failed with status ${response.status}`);
+      }
+
       const data = await response.json();
       setResults(data.results || []);
-    } catch (err) {
-      console.error('Search error:', err);
-      setError('Error calling API: ' + err.message);
+
+    } catch (e) {
+        console.error('Search error:', e);
+        setError('Error calling API: ' + e.message);
     } finally {
       setIsSearching(false);
     }
   };
 
   const handleRewrite = async () => {
-    if (!query.trim()) return;
+    setError('');
     setIsRewriting(true);
-
-    const payload = {
+    try {
+      const MODEL_MAP = {
+      siglip2: { name: 'ViT-B-16-SigLIP2-384', pretrained: 'webli' },
+      siglip:  { name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
+      quickgelu: { name: 'ViT-L-14-quickgelu', pretrained: 'dfn2b' },
+    };
+    const first = selectedModels[0];
+    const clip_model = first ? MODEL_MAP[first] : undefined;
+    const data = await rewrite({
       text: query,
       model: 'gemini-2.5-flash-lite',
-      clip_model: {
-        name: selectedModel.model_name,
-        pretrained: selectedModel.pretrained,
-      },
+      clip_model,
       thinking: false,
-    };
-
-    try {
-      const response = await fetch('http://localhost:8000/rewrite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (data.rewritten_query) {
+    });
+     if (data?.rewritten_query) {
         setQuery(data.rewritten_query);
-      } else {
-        alert('Rewrite failed: No rewritten query returned.');
-      }
-    } catch (error) {
-      console.error('Rewrite error:', error);
-      alert('Rewrite failed due to network/server error.');
+     }
     } finally {
       setIsRewriting(false);
     }
   };
 
+  // Unified search, any combination of [text, image, metadata]
+  const handleUnifiedSearch = async ({ modes, imageFile, metadataQuery, modalityWeights } = {}) => {
+    const MODEL_MAP = {
+      siglip2:   { name: 'ViT-B-16-SigLIP2-384', pretrained: 'webli' },
+      siglip:    { name: 'ViT-L-16-SigLIP-256',   pretrained: 'webli' },
+      quickgelu: { name: 'ViT-L-14-quickgelu',    pretrained: 'dfn2b' },
+    };
+
+    // Fallback: if modes is missing, default to text-only
+    const resolvedModes = modes ?? { text: true, image: false, metadata: false };
+
+    const n = selectedModels.length;
+    const modelsPayload = (n === 1)
+      ? MODEL_MAP[selectedModels[0]]
+      : selectedModels.map(k => MODEL_MAP[k]);
+
+    setError('');
+    setIsSearching(true);
+    try {
+      const fd = new FormData(); // always multipart (image may be present)
+
+      // TEXT branch
+      if (resolvedModes.text) {
+        const q = (query || '').trim();
+        if (!q) {
+          setIsSearching(false);
+          setError('Please enter a query.');
+          return;
+        }
+        fd.append('text_query', q);
+        fd.append('models', JSON.stringify(modelsPayload));
+        if (n >= 2) {
+          const ws = selectedModels.map(k => Number(weights[k]));
+          const rounded = Math.round(ws.reduce((a,b)=>a+b,0) * 10) / 10;
+          if (Number.isNaN(rounded) || rounded !== 1.0) {
+            setIsSearching(false);
+            setError('Weights must sum exactly to 1.');
+            return;
+          }
+          fd.append('model_weights', JSON.stringify(ws));
+        }
+      }
+
+      // IMAGE branch
+      if (resolvedModes.image && imageFile) {
+        fd.append('image_query', imageFile);
+      }
+
+      // METADATA branch (reuse same query)
+      if (resolvedModes.metadata) {
+        const mq = (metadataQuery || '').trim();
+        if (mq) fd.append('metadata_query', mq);
+      }
+
+      // Modality weights (optional)
+      if (modalityWeights) {
+        fd.append('modality_weights', JSON.stringify(modalityWeights));
+      }
+
+      // Pooling & top
+      fd.append('pooling_method', 'max');
+
+      const url = `http://localhost:8000/search_unified?top=100`;
+      const res = await fetch(url, { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(`Search failed with status ${res.status}`);
+      const data = await res.json();
+      setResults(data?.results || []);
+    } catch (e) {
+      console.error('Unified search error:', e);
+      setError('Error calling API: ' + (e?.message || 'unknown'));
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   return (
-    <div style={{ padding: '1rem', fontFamily: 'sans-serif', margin: '0 auto' }}>
-      <h1 style={{ marginBottom: '2rem' }}>News Event Search</h1>
-
-      {/* Search Input */}
-      <SearchBar
-        query={query}
-        onChange={setQuery}
-        onSubmit={handleSearch}
-        onRewrite={handleRewrite}
-        isSearching={isSearching}
-        isRewriting={isRewriting}
-      />
-
-      {/* Model selection */}
-      <div style={{ maxWidth: '500px', margin: '0 auto', padding: '0 1rem' }}>
-        <ModelSelector
-          mode={mode}
-          setMode={setMode}
-          selectedModel={selectedModel}
-          setSelectedModel={setSelectedModel}
-          weights={weights}
-          setWeights={setWeights}
-          AVAILABLE_MODELS={AVAILABLE_MODELS}
-        />
-      </div>
-
-      {/* Error message */}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-
-      {/* Results */}
-      {hasSearched && (
-        <div style={{ marginTop: '0.5rem' }}>
-          <h2>Search Results</h2>
-          <SearchResult isSearching={isSearching} results={results} onSelect={setSelected} />
-        </div>
-      )}
-
-      {/* Video player */}
-      {selected && (
-        <VideoPlayer
-          videoID={selected.video_id}
-          shotID={selected.shot_id}
-          onClose={() => setSelected(null)}
-        />
-      )}
-    </div>
+    <Home
+      query={query}
+      setQuery={setQuery}
+      selectedModels={selectedModels}
+      setSelectedModels={setSelectedModels}
+      weights={weights}
+      setWeights={setWeights}
+      results={results}
+      setSelectedItem={setSelectedItem}
+      onSearch={handleSearch}
+      onRewrite={handleRewrite}
+      onUnifiedSearch={handleUnifiedSearch}
+      loading={loading}
+      isSearching={isSearching}
+      isRewriting={isRewriting}
+      error={error}
+      selectedItem={selectedItem}
+    />
   );
 }
-
-export default App;
