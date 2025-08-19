@@ -176,6 +176,7 @@ class Retriever:
                    for doc in response['hits']['hits']]
         if not results:
             logger.warning("No matches found!")
+            return []
         else:
             logger.info(f"Found {len(results)} matches in {response['took'] / 1000} second(s).")
 
