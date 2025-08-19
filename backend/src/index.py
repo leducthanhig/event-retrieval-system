@@ -14,9 +14,11 @@ from configs import (
     DINO_INDEX_SAVE_PATH,
     FAISS_PRESET,
     MEDIA_INFO_DIR,
+    WHISPER_OUTPUT_PATH,
     DOT_ENV_FILE,
     ELASTIC_HOST,
-    ELASTIC_INDEX_NAME,
+    MEDIA_INFO_INDEX_NAME,
+    TRANSCRIPTION_INDEX_NAME,
 )
 
 # Load environment variables from the .env file
@@ -45,6 +47,9 @@ if __name__ == '__main__':
         # Index features
         vec_indexer = VectorIndexer(FAISS_PRESET)
         vec_indexer.create_index(vector_data, save_path)
+
+    # Index text info
+    es_indexer = TextIndexer(ELASTIC_HOST, api_key=os.environ['ES_LOCAL_API_KEY'])
 
     # Index media info
     fields = ['title', 'description', 'keywords', 'publish_date']
@@ -76,5 +81,25 @@ if __name__ == '__main__':
             }
         }
     }
-    es_indexer = TextIndexer(ELASTIC_HOST, api_key=os.environ['ES_LOCAL_API_KEY'])
-    es_indexer.create_index(ELASTIC_INDEX_NAME, docs, mapping)
+    es_indexer.create_index(MEDIA_INFO_INDEX_NAME, docs, mapping)
+
+    # Index transcriptions
+    with open(WHISPER_OUTPUT_PATH, encoding='utf-8') as f:
+        segments = json.load(f)
+    fields = ['id', 'video_id', 'text']
+    docs = [{key: seg[key] for key in fields} for seg in segments]
+    mapping = {
+        'properties': {
+            'id': {
+                'type': 'integer',
+            },
+            'video_id': {
+                'type': 'keyword',
+                'index': 'false'
+            },
+            'text': {
+                'type': 'text'
+            }
+        }
+    }
+    es_indexer.create_index(TRANSCRIPTION_INDEX_NAME, docs, mapping)
