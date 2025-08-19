@@ -324,7 +324,15 @@ class Retriever:
                 video_id = result['video_id']
                 shot_id = result['shot_id']
                 score = result['score']
-                grouped_results[video_id][shot_id]['scores'][idx] = score
+
+                # Assume that the video-level results are at the last of the list
+                # For results which are video-level
+                # Assign score for all existing shots
+                if not shot_id:
+                    for shot in grouped_results[video_id]:
+                        grouped_results[video_id][shot]['scores'][idx] = score
+                else:
+                    grouped_results[video_id][shot_id]['scores'][idx] = score
 
         # Combine results with the given weights
         combined_results = []
