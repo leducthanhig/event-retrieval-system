@@ -3,6 +3,7 @@ import React from 'react';
 const TABS = [
   { id: 'text', text: 'TEXT' },
   { id: 'image', text: 'IMAGE' },
+  { id: 'transcript', text: 'AUDIO' },
   { id: 'metadata', text: 'FILTER' },
 ];
 

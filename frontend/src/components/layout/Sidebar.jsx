@@ -4,7 +4,7 @@ import TextSearch from '../search/TextSearch';
 import ModelSelector from '../search/ModelSelector';
 import ImageSearch from '../search/ImageSearch';
 import MetaSearch from '../search/MetaSearch';
-
+import TranscriptSearch from '../search/TranscriptSearch';
 
 export default function Sidebar(props) {
   const {
@@ -19,6 +19,7 @@ export default function Sidebar(props) {
 
   const [activeTabs, setActiveTabs] = useState(['text']);
   const [imageFile, setImageFile] = useState(null);
+  const [transcriptQuery, setTranscriptQuery] = useState('');
   const [metadataQuery, setMetadataQuery] = useState('');
 
   return (
@@ -78,7 +79,7 @@ export default function Sidebar(props) {
                   setWeights={setWeights}
                 />
               </div>
-              {(activeTabs.includes('image') || activeTabs.includes('metadata')) && (
+              {(activeTabs.includes('image') || activeTabs.includes('transcript') || activeTabs.includes('metadata')) && (
                 <div style={{ borderTop: '1px solid #374151', margin: '16px 0' }} />
               )}
             </>
@@ -89,6 +90,22 @@ export default function Sidebar(props) {
             <>
               <div style={{ marginTop: 16 }}>
                 <ImageSearch file={imageFile} setFile={setImageFile} />
+              </div>
+              {(activeTabs.includes('metadata') || activeTabs.includes('transcript')) && (
+                <div style={{ borderTop: '1px solid #374151', margin: '16px 0' }} />
+              )}
+            </>
+          )}
+
+          {/* Transcript search */}
+          {activeTabs.includes('transcript') && (
+            <>
+              <div style={{ marginTop: 16 }}>
+                <TranscriptSearch
+                  value={transcriptQuery}
+                  setValue={setTranscriptQuery}
+                  error={error}
+                />
               </div>
               {activeTabs.includes('metadata') && (
                 <div style={{ borderTop: '1px solid #374151', margin: '16px 0' }} />
@@ -128,9 +145,11 @@ export default function Sidebar(props) {
                   modes: {
                     text: activeTabs.includes('text'),
                     image: activeTabs.includes('image'),
+                    transcript: activeTabs.includes('transcript'),
                     metadata: activeTabs.includes('metadata'),
                 },
                 imageFile,
+                transcriptQuery,
                 metadataQuery,
                 })}
               disabled={loading || isSearching}

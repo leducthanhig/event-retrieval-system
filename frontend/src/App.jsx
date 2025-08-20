@@ -22,7 +22,13 @@ export default function App() {
     onResults: (items) => setResults(items || []),
   });
 
-  const handleSearch = async ({ modes, imageFile, metadataQuery, modalityWeights } = {}) => {
+  const handleSearch = async ({ 
+      modes, 
+      imageFile, 
+      transcriptQuery, 
+      metadataQuery, 
+      modalityWeights 
+    } = {}) => {
     const MODEL_MAP = {
       siglip2:   { name: 'ViT-B-16-SigLIP2-384', pretrained: 'webli' },
       siglip:    { name: 'ViT-L-16-SigLIP-256',   pretrained: 'webli' },
@@ -30,7 +36,7 @@ export default function App() {
     };
 
     // Fallback: if modes is missing, default to text-only
-    const resolvedModes = modes ?? { text: true, image: false, metadata: false };
+    const resolvedModes = modes ?? { text: true, image: false, transcript: false, metadata: false };
 
     const n = selectedModels.length;
     const modelsPayload = (n === 1)
@@ -69,7 +75,13 @@ export default function App() {
         fd.append('image_query', imageFile);
       }
 
-      // METADATA branch (reuse same query)
+      // TRANSCRIPT branch
+      if (resolvedModes.transcript) {
+        const tq = (transcriptQuery || '').trim();
+        if (tq) fd.append('transcription_query', tq);
+      }
+
+      // METADATA branch
       if (resolvedModes.metadata) {
         const mq = (metadataQuery || '').trim();
         if (mq) fd.append('metadata_query', mq);
