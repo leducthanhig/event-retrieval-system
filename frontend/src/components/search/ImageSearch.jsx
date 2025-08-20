@@ -1,7 +1,8 @@
-import { useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 
 export default function ImageSearch({ file, setFile }) {
   const inputRef = useRef(null);
+  const [showDelete, setShowDelete] = useState(false);
 
   // Create object URL for the image file
   const url = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
@@ -51,15 +52,20 @@ export default function ImageSearch({ file, setFile }) {
       style={{
         position: 'relative',
         border: '1px solid #374151',
-        borderRadius: 12,
-        padding: 8
+        borderRadius: 8,
+        padding: 2
       }}
+      onMouseEnter={() => setShowDelete(true)}
+      onMouseLeave={() => setShowDelete(false)}
+      onFocus={() => setShowDelete(true)}
+      onBlur={() => setShowDelete(false)}
+      tabIndex={0}
     >
       {url && (
         <img
           src={url}
           alt="query"
-          style={{ maxWidth: '100%', borderRadius: 8, display: 'block' }}
+          style={{ maxWidth: '100%', borderRadius: 6.5, display: 'block' }}
         />
       )}
       <button
@@ -68,19 +74,26 @@ export default function ImageSearch({ file, setFile }) {
         aria-label="Remove image"
         title="Remove image"
         style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           position: 'absolute',
-          top: 8,
-          right: 8,
-          border: '1px solid #4b5563',
-          background: '#111827',
+          top: 6,
+          right: 6,
+          background: 'rgba(17, 24, 39, 0.7)',
           color: '#f9fafb',
-          borderRadius: 9999,
-          width: 28,
-          height: 28,
-          cursor: 'pointer'
+          width: 24,
+          height: 24,
+          borderRadius: '50%',
+          fontSize: 10,
+          lineHeight: 1,
+          cursor: 'pointer',
+          opacity: showDelete ? 1 : 0,
+          pointerEvents: showDelete ? 'auto' : 'none',
+          transition: 'opacity 120ms ease'
         }}
       >
-        ×
+        ✕
       </button>
     </div>
   ) : (
@@ -91,22 +104,20 @@ export default function ImageSearch({ file, setFile }) {
       onPaste={onPaste}
       tabIndex={0}
       style={{
-        border: '2px dashed #6b7280',
-        borderRadius: 12,
+        border: '1.5px dashed #6b7280',
+        borderRadius: 8,
         padding: 16,
-        minHeight: 140,
+        height: 140,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
         color: '#e5e7eb',
         cursor: 'pointer',
         userSelect: 'none'
       }}
       title="Click, paste, or drag & drop an image"
     >
-      <span style={{ fontSize: 22, lineHeight: 1 }}>＋</span>
-      <span>Add image (click / paste / drop)</span>
+      <span style={{ fontSize: 40, lineHeight: 'normal', opacity: 0.7 }}> + </span>
       <input
         ref={inputRef}
         type="file"

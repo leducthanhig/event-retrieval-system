@@ -36,10 +36,10 @@
   }
   
   .sidebar-scroll {
-    max-height: 100vh;        /* giới hạn theo viewport */
-    overflow-y: auto;         /* bật thanh cuộn dọc khi cần */
-    overflow-x: hidden;       /* không cho scroll ngang */
-    scrollbar-gutter: stable; /* chống layout shift khi hiện/ẩn scrollbar */
+    max-height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable; /* avoid layout shift when show/hidden scrollbar */
   }
 
   .ner-results {

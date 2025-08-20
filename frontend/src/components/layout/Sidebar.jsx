@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import SearchModeTabs from '../search/SearchModeTabs';
 import TextSearch from '../search/TextSearch';
 import ModelSelector from '../search/ModelSelector';
-import SearchModeTabs from '../search/SearchModeTabs';
 import ImageSearch from '../search/ImageSearch';
+import MetaSearch from '../search/MetaSearch';
+
 
 export default function Sidebar(props) {
   const {
@@ -68,7 +70,7 @@ export default function Sidebar(props) {
                 error={error}
                 compact
               />
-              <div style={{ marginTop: 16 }}>
+              <div style={{ marginTop: 4 }}>
                 <ModelSelector
                   selectedModels={selectedModels}
                   setSelectedModels={setSelectedModels}
@@ -76,7 +78,9 @@ export default function Sidebar(props) {
                   setWeights={setWeights}
                 />
               </div>
-              <div style={{ borderTop: '1px solid #374151', margin: '16px 0' }} />
+              {(activeTabs.includes('image') || activeTabs.includes('metadata')) && (
+                <div style={{ borderTop: '1px solid #374151', margin: '16px 0' }} />
+              )}
             </>
           )}
 
@@ -86,24 +90,19 @@ export default function Sidebar(props) {
               <div style={{ marginTop: 16 }}>
                 <ImageSearch file={imageFile} setFile={setImageFile} />
               </div>
-              <div style={{ borderTop: '1px solid #374151', margin: '16px 0' }} />
+              {activeTabs.includes('metadata') && (
+                <div style={{ borderTop: '1px solid #374151', margin: '16px 0' }} />
+              )}
             </>
           )}
 
           {/* Metadata search */}
           {activeTabs.includes('metadata') && (
             <div style={{ marginTop: 16 }}>
-              <input
-                type="text"
-                placeholder="Enter metadata keywords..."
+              <MetaSearch
                 value={metadataQuery}
-                onChange={(e) => setMetadataQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: 6,
-                }}
+                setValue={setMetadataQuery}
+                error={error}
               />
             </div>
           )}

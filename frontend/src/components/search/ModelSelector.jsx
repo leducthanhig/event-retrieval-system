@@ -43,8 +43,6 @@ export default function ModelSelector({
     if (selectedModels.includes(key)) {
       const next = selectedModels.filter(k => k !== key);
       setSelectedModels(next);
-      // optional: clear its weight visually
-      // setWeights(prev => ({ ...prev, [key]: '' }));
     } else {
       setSelectedModels([...selectedModels, key]);
     }

@@ -44,7 +44,6 @@ export default function TextSearch({ query, setQuery, onSearch, loading, error, 
 
   return (
     <div>
-      {/* Textarea for query input */}
       <textarea
         className="query-textarea"
         ref={taRef}
