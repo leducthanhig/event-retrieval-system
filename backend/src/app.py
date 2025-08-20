@@ -293,6 +293,9 @@ class App(FastAPI):
         ) -> list[dict]:
         """Helper for image search."""
         img = Image.open(image_file.file)
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+
         index_name = os.path.splitext(os.path.basename(DINO_INDEX_SAVE_PATH))[0].removeprefix('index_')
         frames = self.retriever.search_by_image(img, index_name, top)
         return Retriever.combine_frames(frames, pooling_method)
