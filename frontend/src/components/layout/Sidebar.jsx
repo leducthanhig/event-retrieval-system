@@ -1,21 +1,20 @@
 import { useState } from 'react';
-import SearchControls from '../search/SearchControls';
+import TextSearch from '../search/TextSearch';
 import ModelSelector from '../search/ModelSelector';
 import SearchModeTabs from '../search/SearchModeTabs';
-import ImagePicker from '../search/ImagePicker';
+import ImageSearch from '../search/ImageSearch';
 
 export default function Sidebar(props) {
   const {
     query, setQuery,
     selectedModels, setSelectedModels,
     weights, setWeights,
-    onUnifiedSearch,
+    onSearch,
     onRewrite,
     loading, error,
     isSearching, isRewriting,
   } = props;
 
-  // State for active tabs and image file
   const [activeTabs, setActiveTabs] = useState(['text']);
   const [imageFile, setImageFile] = useState(null);
   const [metadataQuery, setMetadataQuery] = useState('');
@@ -32,15 +31,15 @@ export default function Sidebar(props) {
           padding: 0,
         }}
       >
-        {/*System title + Tabs) */}
+        {/* Header */}
         <div style={{ 
-          padding: '16px 12px 8px 12px', 
-          //borderBottom: '1px solid #374151',
+          padding: '16px 12px 8px 12px',
           position: 'sticky',
           top: 0,
           background: '#1e1e1e',
           zIndex: 2,
         }}>
+          {/* System's name */}
           <div style={{ textAlign: 'center', wordBreak: 'break-word' }}>
             <div style={{ fontWeight: 700, lineHeight: 1.2, fontSize: 18, letterSpacing: 0.5 }}>
               EVENT RETRIEVAL SYSTEM
@@ -50,25 +49,22 @@ export default function Sidebar(props) {
             </div>
           </div>
 
-          {/* Tabs (TEXT / IMAGE / METADATA) */}
+          {/* Search Mode Tabs */}
           <div style={{ marginTop: 16 }}>
             <SearchModeTabs activeTabs={activeTabs} setActiveTabs={setActiveTabs} />
           </div>
         </div>
 
-        {/* Scrollable content */}
+        {/* Searching content */}
         <div style={{ flex: 1, padding: '12px' }}>
           {/* Text search */}
           {activeTabs.includes('text') && (
             <>
-              <SearchControls
+              <TextSearch
                 query={query}
                 setQuery={setQuery}
-                onSearch={onUnifiedSearch}
-                onRewrite={onRewrite}
+                onSearch={onSearch}
                 loading={loading}
-                isSearching={isSearching}
-                isRewriting={isRewriting}
                 error={error}
                 compact
               />
@@ -88,7 +84,7 @@ export default function Sidebar(props) {
           {activeTabs.includes('image') && (
             <>
               <div style={{ marginTop: 16 }}>
-                <ImagePicker file={imageFile} setFile={setImageFile} />
+                <ImageSearch file={imageFile} setFile={setImageFile} />
               </div>
               <div style={{ borderTop: '1px solid #374151', margin: '16px 0' }} />
             </>
@@ -113,44 +109,65 @@ export default function Sidebar(props) {
           )}
         </div>
 
-        {/* Footer (sticky Search button) */}
+        {/* Footer */}
         <div
           style={{
             borderTop: '1px solid #374151',
-            padding: '12px',
+            padding: '8px 10px',
             marginTop: 'auto',
             position: 'sticky',
             bottom: 0,
             background: '#1e1e1e',
-            zIndex: 2
+            zIndex: 2,
+            display: 'flex',
+            gap: 8,
           }}
         >
           <button
-            onClick={() => 
-              onUnifiedSearch({ 
-                modes: {
-                  text: activeTabs.includes('text'),
-                  image: activeTabs.includes('image'),
-                  metadata: activeTabs.includes('metadata'),
-               },
-               imageFile,
-               metadataQuery,
-              })}
-            disabled={loading || isSearching}
-            style={{
-              width: '100%',
-              padding: '10px',
-              fontSize: 15,
-              fontWeight: 600,
-              borderRadius: 6,
-              border: '1px solid #d1d5db',
-              backgroundColor: '#1a1a1a',
-              color: 'white',
-              cursor: loading || isSearching ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isSearching ? 'Searching' : 'Search'}
-          </button>
+              onClick={() => 
+                onSearch({ 
+                  modes: {
+                    text: activeTabs.includes('text'),
+                    image: activeTabs.includes('image'),
+                    metadata: activeTabs.includes('metadata'),
+                },
+                imageFile,
+                metadataQuery,
+                })}
+              disabled={loading || isSearching}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                fontSize: 16,
+                fontWeight: 600,
+                borderRadius: 18,
+                backgroundColor: '#532d8d',
+                color: 'white',
+                cursor: loading || isSearching ? 'not-allowed' : 'pointer',
+                flex: 3,
+              }}
+            >
+              {isSearching ? 'Searching' : 'Search'}
+            </button>
+
+            <button
+              onClick={onRewrite}
+              disabled={loading || isRewriting || !activeTabs.includes('text')}
+              style={{ 
+                width: '100%',
+                padding: '8px 10px',
+                fontSize: 16,
+                fontWeight: 600,
+                borderRadius: 18,
+                //border: '1px solid #d1d5db',
+                backgroundColor: '#1a1a1a',
+                color: 'white',
+                cursor: loading || isSearching ? 'not-allowed' : 'pointer',
+                flex: 1,
+              }}
+            >
+              {isRewriting ? 'Rewriting' : 'Rew'}
+            </button>
         </div>
       </div>
     </aside>

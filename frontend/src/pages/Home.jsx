@@ -25,7 +25,6 @@ export default function Home(props) {
           setWeights={setWeights}
           onSearch={onSearch}
           onRewrite={onRewrite}
-          onUnifiedSearch={onUnifiedSearch}
           loading={loading}
           isSearching={isSearching}
           isRewriting={isRewriting}

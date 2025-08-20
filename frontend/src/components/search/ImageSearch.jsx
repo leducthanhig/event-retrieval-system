@@ -1,6 +1,6 @@
 import { useRef, useMemo, useEffect } from 'react';
 
-export default function ImagePicker({ file, setFile }) {
+export default function ImageSearch({ file, setFile }) {
   const inputRef = useRef(null);
 
   // Create object URL for the image file

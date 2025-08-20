@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export default function SearchControls({ query, setQuery, onSearch, onRewrite, loading, error, compact, isSearching, isRewriting }) {
+export default function TextSearch({ query, setQuery, onSearch, loading, error, compact, }) {
   const taRef = useRef(null);
   const [reachedMax, setReachedMax] = useState(false);
   const [maxPx, setMaxPx] = useState(() => Math.floor(window.innerHeight * 0.4));
@@ -72,25 +72,6 @@ export default function SearchControls({ query, setQuery, onSearch, onRewrite, l
         }}
         aria-label="Query"
       />
-      
-      {/* Buttons for search and rewrite */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          className="ner-btn"
-          onClick={onSearch}
-          disabled={isSearching}
-        >
-          {isSearching ? 'Searching' : 'Search'}
-        </button>
-
-        <button
-          className="ner-btn"
-          onClick={onRewrite}
-          disabled={isRewriting}
-        >
-          {isRewriting ? 'Rewriting' : 'Rewrite'}
-        </button>
-      </div>
       
       {/* Error message*/}
       {error ? (

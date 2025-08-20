@@ -7,7 +7,6 @@ const TABS = [
 ];
 
 export default function SearchModeTabs({ activeTabs, setActiveTabs }) {
-  // Toggle a tab on/off
   const toggleTab = (id) => {
     setActiveTabs(prev =>
       prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
@@ -16,7 +15,6 @@ export default function SearchModeTabs({ activeTabs, setActiveTabs }) {
 
   return (
     <div
-      // Full-width row, each tab will take 1/3 via flex:1
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -31,7 +29,6 @@ export default function SearchModeTabs({ activeTabs, setActiveTabs }) {
             key={tab.id}
             onClick={() => toggleTab(tab.id)}
             aria-pressed={active}
-            // Pure text look; equal width; blue text + underline when active
             style={{
               flex: 1,
               background: 'transparent',
