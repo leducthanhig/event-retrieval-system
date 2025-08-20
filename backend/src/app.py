@@ -321,7 +321,7 @@ class App(FastAPI):
 
             final_results.append({
                 'video_id': video_id,
-                'shot_id': '',
+                'shot_id': shot_id,
                 'thumbnail': thumbnail,
                 'score': score,
             })
