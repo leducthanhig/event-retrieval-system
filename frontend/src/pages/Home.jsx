@@ -7,10 +7,11 @@ export default function Home(props) {
     selectedModels, setSelectedModels,
     weights, setWeights,
     results, setSelectedItem,
-    onSearch, onRewrite, onUnifiedSearch, 
+    onSearch, onRewrite, 
     loading, error,
     isSearching, isRewriting,
     selectedItem,
+    onSimilarSearch,
   } = props;
 
   return (
@@ -38,6 +39,7 @@ export default function Home(props) {
           onSelect={setSelectedItem}
           selectedItem={selectedItem}
           onClosePreview={() => setSelectedItem(null)}
+          onSimilarSearch={onSimilarSearch}
         />
       </main>
     </div>

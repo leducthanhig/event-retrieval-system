@@ -95,7 +95,7 @@ export default function App() {
       // Pooling & top
       fd.append('pooling_method', 'max');
 
-      const url = `http://localhost:8000/search?top=100`;
+      const url = `/search?top=100`;
       const res = await fetch(url, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`Search failed with status ${res.status}`);
       const data = await res.json();
@@ -150,6 +150,12 @@ export default function App() {
       isRewriting={isRewriting}
       error={error}
       selectedItem={selectedItem}
+      onSimilarSearch={(file) =>
+        handleSearch({
+          modes: { text: false, image: true, transcription: false, metadata: false },
+          imageFile: file,
+        })
+      }
     />
   );
 }

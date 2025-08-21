@@ -4,4 +4,11 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      '/search':  { target: 'http://localhost:8000', changeOrigin: true },
+      '/shots':   { target: 'http://localhost:8000', changeOrigin: true },
+      '/images':  { target: 'http://localhost:8000', changeOrigin: true },
+    },
+  },
 })

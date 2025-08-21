@@ -1,6 +1,6 @@
 import ResultCard from './ResultCard';
 
-export default function ResultsGrid({ results, onSelect }) {
+export default function ResultsGrid({ results, onSelect, onSimilarSearch }) {
   if (!results || results.length === 0) {
     return (
       <div style={{ padding: '1rem', color: '#9ca3af', textAlign: 'center' }}>
@@ -12,7 +12,12 @@ export default function ResultsGrid({ results, onSelect }) {
   return (
     <div className="results-grid">
       {results.map((item, idx) => (
-        <ResultCard key={idx} item={item} onSelect={() => onSelect(item)} />
+        <ResultCard 
+          key={idx} 
+          item={item} 
+          onSelect={() => onSelect(item)}
+          onSimilarSearch={onSimilarSearch}  
+        />
       ))}
     </div>
   );

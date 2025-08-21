@@ -34,7 +34,7 @@ export default function TranscriptSearch({ value, setValue, error }) {
       <textarea
         ref={taRef}
         className="query-textarea"
-        placeholder="Enter transcript keywords..."
+        placeholder="Enter transcript keywords"
         value={value}
         onChange={handleChange}
         onInput={autoResize}
@@ -44,7 +44,7 @@ export default function TranscriptSearch({ value, setValue, error }) {
           width: '100%',
           boxSizing: 'border-box',
           padding: '8px',
-          borderRadius: 6,
+          borderRadius: 4,
           border: '1px solid #d1d5db',
           resize: 'none',
           overflowY: reachedMax ? 'auto' : 'hidden',
