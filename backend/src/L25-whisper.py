@@ -18,7 +18,7 @@ for v_idx, file in tqdm(enumerate(file_paths), total=len(file_paths)):
     for s_idx, segment in enumerate(segments):
         data.append({
             'video_id': video_id,
-            'id': segment.id,
+            'id': segment.id - 1,
             'start': segment.start,
             'end': segment.end,
             'text': segment.text,
