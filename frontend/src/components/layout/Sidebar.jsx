@@ -10,6 +10,8 @@ export default function Sidebar(props) {
   const {
     query, setQuery,
     topK, setTopK,
+    activeTabs, setActiveTabs,
+    modalityWeights, setModalityWeights,
     selectedModels, setSelectedModels,
     weights, setWeights,
     onSearch,
@@ -18,7 +20,6 @@ export default function Sidebar(props) {
     isSearching, isRewriting,
   } = props;
 
-  const [activeTabs, setActiveTabs] = useState(['text']);
   const [imageFile, setImageFile] = useState(null);
   const [transcriptQuery, setTranscriptQuery] = useState('');
   const [metadataQuery, setMetadataQuery] = useState('');
@@ -54,8 +55,13 @@ export default function Sidebar(props) {
           </div>
 
           {/* Search Mode Tabs */}
-          <div style={{ marginTop: 16 }}>
-            <SearchModeTabs activeTabs={activeTabs} setActiveTabs={setActiveTabs} />
+          <div style={{ marginTop: 14 }}>
+            <SearchModeTabs 
+              activeTabs={activeTabs} 
+              setActiveTabs={setActiveTabs}
+              modalityWeights={modalityWeights}
+              setModalityWeights={setModalityWeights}
+            />
           </div>
         </div>
 
@@ -80,7 +86,7 @@ export default function Sidebar(props) {
                   setWeights={setWeights}
                 />
               </div>
-              {(activeTabs.includes('image') || activeTabs.includes('transcript') || activeTabs.includes('metadata')) && (
+              {(activeTabs.includes('image') || activeTabs.includes('transcription') || activeTabs.includes('metadata')) && (
                 <div style={{ borderTop: '1px solid #374151', margin: '16px 0' }} />
               )}
             </>
@@ -92,14 +98,14 @@ export default function Sidebar(props) {
               <div style={{ marginTop: 16 }}>
                 <ImageSearch file={imageFile} setFile={setImageFile} />
               </div>
-              {(activeTabs.includes('metadata') || activeTabs.includes('transcript')) && (
+              {(activeTabs.includes('metadata') || activeTabs.includes('transcription')) && (
                 <div style={{ borderTop: '1px solid #374151', margin: '16px 0' }} />
               )}
             </>
           )}
 
           {/* Transcript search */}
-          {activeTabs.includes('transcript') && (
+          {activeTabs.includes('transcription') && (
             <>
               <div style={{ marginTop: 16 }}>
                 <TranscriptSearch
@@ -146,7 +152,7 @@ export default function Sidebar(props) {
                   modes: {
                     text: activeTabs.includes('text'),
                     image: activeTabs.includes('image'),
-                    transcript: activeTabs.includes('transcript'),
+                    transcription: activeTabs.includes('transcription'),
                     metadata: activeTabs.includes('metadata'),
                 },
                 imageFile,
@@ -163,7 +169,7 @@ export default function Sidebar(props) {
                 backgroundColor: '#532d8d',
                 color: 'white',
                 cursor: loading || isSearching ? 'not-allowed' : 'pointer',
-                flex: 3,
+                flex: 6,
               }}
             >
               {isSearching ? 'Searching' : 'Search'}
@@ -181,11 +187,13 @@ export default function Sidebar(props) {
                 //border: '1px solid #d1d5db',
                 backgroundColor: '#1a1a1a',
                 color: 'white',
-                cursor: loading || isSearching ? 'not-allowed' : 'pointer',
+                backgroundColor: (loading || isRewriting || !activeTabs.includes('text')) ? '#2d2d2d' : '#1a1a1a',
+                cursor: (loading || isSearching || !activeTabs.includes('text')) ? 'not-allowed' : 'pointer',
+                opacity: (loading || isRewriting || !activeTabs.includes('text')) ? 0.6 : 1,
                 flex: 1,
               }}
             >
-              {isRewriting ? 'Rewriting' : 'Rew'}
+              {isRewriting ? 'Rewriting' : 'R'}
             </button>
 
             {/* Input top-k*/}

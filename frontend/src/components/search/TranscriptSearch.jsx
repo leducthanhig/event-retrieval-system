@@ -55,9 +55,6 @@ export default function TranscriptSearch({ value, setValue, error }) {
         }}
         aria-label="Transcript query"
       />
-      {error ? (
-        <div style={{ color: '#b91c1c', marginTop: 8, fontSize: 14 }}>{error}</div>
-      ) : null}
     </div>
   );
 }

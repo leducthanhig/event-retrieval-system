@@ -5,6 +5,8 @@ export default function Home(props) {
   const {
     query, setQuery,
     topK, setTopK,
+    activeTabs, setActiveTabs,
+    modalityWeights, setModalityWeights,
     selectedModels, setSelectedModels,
     weights, setWeights,
     results, setSelectedItem,
@@ -23,6 +25,10 @@ export default function Home(props) {
           setQuery={setQuery}
           topK={topK}
           setTopK={setTopK}
+          activeTabs={activeTabs}
+          setActiveTabs={setActiveTabs}
+          modalityWeights={modalityWeights}
+          setModalityWeights={setModalityWeights}
           selectedModels={selectedModels}
           setSelectedModels={setSelectedModels}
           weights={weights}

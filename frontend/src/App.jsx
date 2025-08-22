@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Home from './pages/Home';
 import './styles/layout.css';
 import useSearch from './hooks/useSearch';
@@ -17,6 +17,37 @@ export default function App() {
   // Results & selection
   const [results, setResults] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null); // for preview modal/video
+
+  // Weights for different modalities
+  const [modalityWeights, setModalityWeights] = useState({
+    text: 1.0,
+    image: 0.0,
+    transcription: 0.0,
+    metadata: 0.0,
+  });
+
+  // Active search modes (tabs)
+  const [activeTabs, setActiveTabs] = useState(['text']);
+  const toggleTab = (id) => {
+    setActiveTabs(prev => {
+      const on = prev.includes(id);
+      const next = on ? prev.filter(t => t !== id) : [...prev, id];
+      // sync weight về 0 khi tắt
+      if (on) setModalityWeights(w => ({ ...w, [id]: 0.0 }));
+      return next;
+    });
+  };
+  
+  useEffect(() => {
+    setModalityWeights(w => {
+      const next = { ...w };
+      const keys = ['text','image','transcription','metadata'];
+      keys.forEach(k => {
+        if (!activeTabs.includes(k)) next[k] = 0.0;
+      });
+      return next;
+    });
+  }, [activeTabs, setModalityWeights]);
 
   // API hooks
   const { search, rewrite, loading, error, setError } = useSearch({
@@ -41,16 +72,17 @@ export default function App() {
       imageFile, 
       transcriptQuery, 
       metadataQuery, 
-      modalityWeights 
+      modalityWeights: mwOverride 
     } = {}) => {
+
+    // Fallback: if modes is missing, default to text-only
+    const resolvedModes = modes ?? { text: true, image: false, transcription: false, metadata: false };
+
     const MODEL_MAP = {
       siglip2:   { name: 'ViT-B-16-SigLIP2-384', pretrained: 'webli' },
       siglip:    { name: 'ViT-L-16-SigLIP-256',   pretrained: 'webli' },
       quickgelu: { name: 'ViT-L-14-quickgelu',    pretrained: 'dfn2b' },
     };
-
-    // Fallback: if modes is missing, default to text-only
-    const resolvedModes = modes ?? { text: true, image: false, transcript: false, metadata: false };
 
     const n = selectedModels.length;
     const modelsPayload = (n === 1)
@@ -59,26 +91,48 @@ export default function App() {
 
     setError('');
     setIsSearching(true);
+
     try {
+      const fd = new FormData(); // always multipart
+
       // Validate search modes
       if (!resolvedModes.text && !resolvedModes.image && !resolvedModes.transcription && !resolvedModes.metadata) {
         return failSearch('Please select at least one search mode.');
       }
 
+      // Validate modality weights
+      const activeKeys = ['text', 'image', 'transcription', 'metadata'].filter(k => resolvedModes[k]);
+      const mw = mwOverride ?? modalityWeights ?? {};
+      if (activeKeys.length >= 2) {
+        const ws = activeKeys.map(k => Number(mw?.[k] ?? 0));
+        if (ws.some(x => Number.isNaN(x))) {
+          return failSearch('Please enter valid decimal modality weights.');
+        }
+        const sum = ws.reduce((a,b)=>a+b, 0);
+        const roundedSum = Math.round(sum * 10) / 10; // round to nearest 0.1
+        if (roundedSum !== 1.0) {
+          return failSearch('Modality weights must sum exactly to 1.');
+        }
+        // send attached weights to backend with same keynames
+        fd.append(
+          'modality_weights', 
+          JSON.stringify(activeKeys.reduce((obj, k, i) => ((obj[k] = ws[i]), obj), {}))
+        );
+      } else if (activeKeys.length === 1) {
+        // 1 mode: skip weights
+      }
+
       // Validate top-k
       const k = parseInt(topK, 10);
       if (Number.isNaN(k) || k <= 0 || k > 500) {
-        setIsSearching(false);
         return failSearch('Top-k must be an integer between 1 and 500.');
       }
-
-      const fd = new FormData(); // always multipart (image may be present)
 
       // TEXT branch
       if (resolvedModes.text) {
         const q = (query || '').trim();
         if (!q) {
-          return failSearch('Please enter a query.');
+          return failSearch('Please enter a text query.');
         }
         fd.append('text_query', q);
         fd.append('models', JSON.stringify(modelsPayload));
@@ -88,30 +142,33 @@ export default function App() {
           if (Number.isNaN(rounded) || rounded !== 1.0) {
             return failSearch('Weights must sum exactly to 1.');
           }
-          fd.append('model_weights', JSON.stringify(ws));
         }
       }
 
       // IMAGE branch
-      if (resolvedModes.image && imageFile) {
+      if (resolvedModes.image) {
+        if (!imageFile) {
+          return failSearch('Please upload an image.');
+        }
         fd.append('image_query', imageFile);
       }
 
       // TRANSCRIPT branch
-      if (resolvedModes.transcript) {
+      if (resolvedModes.transcription) {
         const tq = (transcriptQuery || '').trim();
+        if (!tq) {
+          return failSearch('Please enter a transcription query.');
+        }
         if (tq) fd.append('transcription_query', tq);
       }
 
       // METADATA branch
       if (resolvedModes.metadata) {
         const mq = (metadataQuery || '').trim();
+        if (!mq) {
+          return failSearch('Please enter a metadata query.');
+        }
         if (mq) fd.append('metadata_query', mq);
-      }
-
-      // Modality weights (optional)
-      if (modalityWeights) {
-        fd.append('modality_weights', JSON.stringify(modalityWeights));
       }
 
       // Pooling & top
@@ -135,11 +192,18 @@ export default function App() {
     setError('');
     setIsRewriting(true);
     try {
+      // validate query
+      const q = (query || '').trim();
+      if (!q) {
+        return failSearch('Please enter a text query.');
+      }
+
       const MODEL_MAP = {
       siglip2: { name: 'ViT-B-16-SigLIP2-384', pretrained: 'webli' },
       siglip:  { name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
       quickgelu: { name: 'ViT-L-14-quickgelu', pretrained: 'dfn2b' },
     };
+
     const first = selectedModels[0];
     const clip_model = first ? MODEL_MAP[first] : undefined;
     const data = await rewrite({
@@ -162,6 +226,10 @@ export default function App() {
       setQuery={setQuery}
       topK={topK}
       setTopK={setTopK}
+      activeTabs={activeTabs}
+      setActiveTabs={setActiveTabs}
+      modalityWeights={modalityWeights}
+      setModalityWeights={setModalityWeights}
       selectedModels={selectedModels}
       setSelectedModels={setSelectedModels}
       weights={weights}

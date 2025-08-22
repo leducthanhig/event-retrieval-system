@@ -56,9 +56,6 @@ export default function MetaSearch({ value, setValue, error }) {
         }}
         aria-label="Metadata query"
       />
-      {error ? (
-        <div style={{ color: '#b91c1c', marginTop: 8, fontSize: 14 }}>{error}</div>
-      ) : null}
     </div>
   );
 }
