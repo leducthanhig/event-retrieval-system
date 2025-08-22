@@ -4,6 +4,7 @@ import ResultsPane from '../components/layout/ResultsPane';
 export default function Home(props) {
   const {
     query, setQuery,
+    topK, setTopK,
     selectedModels, setSelectedModels,
     weights, setWeights,
     results, setSelectedItem,
@@ -20,6 +21,8 @@ export default function Home(props) {
         <Sidebar
           query={query}
           setQuery={setQuery}
+          topK={topK}
+          setTopK={setTopK}
           selectedModels={selectedModels}
           setSelectedModels={setSelectedModels}
           weights={weights}
@@ -40,6 +43,7 @@ export default function Home(props) {
           selectedItem={selectedItem}
           onClosePreview={() => setSelectedItem(null)}
           onSimilarSearch={onSimilarSearch}
+          error={error}
         />
       </main>
     </div>

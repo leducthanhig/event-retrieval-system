@@ -1,9 +1,9 @@
 import ResultCard from './ResultCard';
 
-export default function ResultsGrid({ results, onSelect, onSimilarSearch }) {
-  if (!results || results.length === 0) {
+export default function ResultsGrid({ results, onSelect, onSimilarSearch, error }) {
+  if ((!results || results.length === 0) && !error) {
     return (
-      <div style={{ padding: '1rem', color: '#9ca3af', textAlign: 'center' }}>
+      <div style={{ padding: '1rem', color: '#9ca3af', textAlign: 'left' }}>
         No results found.
       </div>
     );
