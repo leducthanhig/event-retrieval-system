@@ -9,6 +9,7 @@ import TranscriptSearch from '../search/TranscriptSearch';
 export default function Sidebar(props) {
   const {
     query, setQuery,
+    topK, setTopK,
     selectedModels, setSelectedModels,
     weights, setWeights,
     onSearch,
@@ -186,6 +187,27 @@ export default function Sidebar(props) {
             >
               {isRewriting ? 'Rewriting' : 'Rew'}
             </button>
+
+            {/* Input top-k*/}
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={topK}
+              onChange={(e) => setTopK(e.target.value)}
+              title="Top-k (1–500)"
+              style={{
+                width: 65,
+                padding: '8px 8px',
+                fontSize: 14,
+                borderRadius: 4,
+                border: '0.7px solid #d1d5db',
+                backgroundColor: '#111827',
+                color: '#f9fafb',
+                boxSizing: 'border-box',
+                outline: 'none'
+              }}
+            />
         </div>
       </div>
     </aside>

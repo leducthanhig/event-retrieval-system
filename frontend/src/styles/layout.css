@@ -112,6 +112,12 @@
   cursor: not-allowed;
 }
 
+.action-btn:focus,
+.ner-btn:focus,
+button:focus {
+  outline: none;
+}
+
 .action-btn {
   border: 1px solid transparent;
   border-radius: 6px;

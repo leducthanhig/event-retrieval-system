@@ -5,6 +5,7 @@ import useSearch from './hooks/useSearch';
 
 export default function App() {
   // Core search states
+  const [topK, setTopK] = useState('100');
   const [query, setQuery] = useState('');
   const [selectedModels, setSelectedModels] = useState(['siglip2']);
   const [weights, setWeights] = useState({ siglip2: '1.0', siglip: '0.0', quickgelu: '0.0' });
@@ -21,6 +22,19 @@ export default function App() {
   const { search, rewrite, loading, error, setError } = useSearch({
     onResults: (items) => setResults(items || []),
   });
+
+  // Clear previous results and selection
+  const clearResults = () => {
+    setResults([]);
+    setSelectedItem(null);
+  };
+
+  // Unified way to fail a search: set error, clear results, stop spinner
+  const failSearch = (msg) => {
+    setError(msg);
+    clearResults();
+    setIsSearching(false);
+  };
 
   const handleSearch = async ({ 
       modes, 
@@ -46,15 +60,25 @@ export default function App() {
     setError('');
     setIsSearching(true);
     try {
+      // Validate search modes
+      if (!resolvedModes.text && !resolvedModes.image && !resolvedModes.transcription && !resolvedModes.metadata) {
+        return failSearch('Please select at least one search mode.');
+      }
+
+      // Validate top-k
+      const k = parseInt(topK, 10);
+      if (Number.isNaN(k) || k <= 0 || k > 500) {
+        setIsSearching(false);
+        return failSearch('Top-k must be an integer between 1 and 500.');
+      }
+
       const fd = new FormData(); // always multipart (image may be present)
 
       // TEXT branch
       if (resolvedModes.text) {
         const q = (query || '').trim();
         if (!q) {
-          setIsSearching(false);
-          setError('Please enter a query.');
-          return;
+          return failSearch('Please enter a query.');
         }
         fd.append('text_query', q);
         fd.append('models', JSON.stringify(modelsPayload));
@@ -62,9 +86,7 @@ export default function App() {
           const ws = selectedModels.map(k => Number(weights[k]));
           const rounded = Math.round(ws.reduce((a,b)=>a+b,0) * 10) / 10;
           if (Number.isNaN(rounded) || rounded !== 1.0) {
-            setIsSearching(false);
-            setError('Weights must sum exactly to 1.');
-            return;
+            return failSearch('Weights must sum exactly to 1.');
           }
           fd.append('model_weights', JSON.stringify(ws));
         }
@@ -95,13 +117,14 @@ export default function App() {
       // Pooling & top
       fd.append('pooling_method', 'max');
 
-      const url = `/search?top=100`;
+      const url = `/search?top=${k || 100}`;
       const res = await fetch(url, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`Search failed with status ${res.status}`);
       const data = await res.json();
       setResults(data?.results || []);
     } catch (e) {
       console.error('Unified search error:', e);
+      clearResults();
       setError('Error calling API: ' + (e?.message || 'unknown'));
     } finally {
       setIsSearching(false);
@@ -137,6 +160,8 @@ export default function App() {
     <Home
       query={query}
       setQuery={setQuery}
+      topK={topK}
+      setTopK={setTopK}
       selectedModels={selectedModels}
       setSelectedModels={setSelectedModels}
       weights={weights}
