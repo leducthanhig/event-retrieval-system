@@ -8,11 +8,10 @@ from dotenv import load_dotenv
 from cores.indexing import VectorIndexer, TextIndexer
 
 from configs import (
-    CLIP_VECTOR_DATA_PATH,
+    DATA_ROOT_DIR,
+    CLIP_MODELS,
     DINO_VECTOR_DATA_PATH,
-    CLIP_INDEX_SAVE_PATH,
     DINO_INDEX_SAVE_PATH,
-    FAISS_PRESET,
     MEDIA_INFO_DIR,
     WHISPER_OUTPUT_PATH,
     DOT_ENV_FILE,
@@ -33,20 +32,22 @@ logging.basicConfig(
 if __name__ == '__main__':
     # Index vectors
     data_paths = [
-        CLIP_VECTOR_DATA_PATH,
+        *[f"{DATA_ROOT_DIR}/vectors_{model}_{pretrained}.npy"
+          for model, pretrained in CLIP_MODELS],
         DINO_VECTOR_DATA_PATH,
     ]
     save_paths = [
-        CLIP_INDEX_SAVE_PATH,
+        *[f"{DATA_ROOT_DIR}/index_{model}_{pretrained}.bin"
+          for model, pretrained in CLIP_MODELS],
         DINO_INDEX_SAVE_PATH,
     ]
+    vec_indexer = VectorIndexer()
     for data_path, save_path in zip(data_paths, save_paths):
         # Load data from disk
         vector_data = np.load(data_path)
 
         # Index features
-        vec_indexer = VectorIndexer(FAISS_PRESET)
-        vec_indexer.create_index(vector_data, save_path)
+        vec_indexer.create_index(vector_data, '', save_path)
 
     # Index text info
     es_indexer = TextIndexer(ELASTIC_HOST, api_key=os.environ['ES_LOCAL_API_KEY'])

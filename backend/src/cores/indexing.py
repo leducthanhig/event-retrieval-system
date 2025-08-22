@@ -1,5 +1,4 @@
 import logging
-from typing_extensions import Literal
 
 import numpy as np
 import faiss
@@ -8,79 +7,23 @@ from elasticsearch import Elasticsearch, helpers
 logger = logging.getLogger(__name__)
 
 class VectorIndexer:
-    # Define preset configurations
-    PRESETS = {
-        "high_accuracy": {
-            "index_type": "flat",  # Use flat index for highest accuracy
-            "n_regions_factor": None,  # Not applicable for flat index
-            "description": "Highest accuracy but slower search speed"
-        },
-        "balanced": {
-            "index_type": "ivf_flat",
-            "n_regions_factor": 4,  # Default factor for n_regions calculation
-            "description": "Balance between accuracy and speed"
-        },
-        "high_speed": {
-            "index_type": "ivf_flat",
-            "n_regions_factor": 8,  # More regions for faster search
-            "description": "Fastest search speed with reduced accuracy"
-        }
-    }
+    def __init__(self):
+        self.indices: dict[str, faiss.IndexFlatIP] = {}
 
-    def __init__(self, preset: Literal['high_accuracy', 'balanced', 'high_speed'] = 'balanced'):
-        # Validate preset
-        if preset not in self.PRESETS:
-            raise ValueError(f"Invalid preset '{preset}'. Choose from: {list(self.PRESETS.keys())}")
-
-        preset_config = self.PRESETS[preset]
-        self.index_type = preset_config['index_type']
-        self.n_regions_factor = preset_config['n_regions_factor']
-
-        # Log preset info
-        logger.info(f"Using '{preset}' preset: {preset_config['description']}")
-        logger.info(f"Preset configuration: index_type={self.index_type}")
-
-    def create_index(self, vectors: np.ndarray, save_path: str):
-        """Index all given feature vectors based on the preset configuration."""
+    def create_index(self, vectors: np.ndarray, index_name: str, save_path: str):
+        """Index all given feature vectors."""
         feature_dim = vectors.shape[-1]
+        self.indices[index_name] = faiss.IndexFlatIP(feature_dim)
+        logger.info(f"Created Flat index for {feature_dim}-dimension vectors")
 
-        if self.index_type == 'flat':
-            # For high accuracy, use a flat index (exact search)
-            logger.info("Creating new Flat index for high accuracy")
-            self.index = faiss.IndexFlatL2(feature_dim)
+        self.indices[index_name].add(vectors)
+        logger.info(f"Added {self.indices[index_name].ntotal} vectors")
 
-            # Flat index doesn't need training
-            self.index.add(vectors)
-            logger.info(f"Total vectors in index: {self.index.ntotal}")
+        self.save(index_name, save_path)
 
-        elif self.index_type == 'ivf_flat':
-            # Calculate n_regions based on number of vectors and preset factor
-            num_vectors = len(vectors)
-            n_regions = min(int(self.n_regions_factor * np.sqrt(num_vectors)), num_vectors // 2)
-
-            # Initialize new FAISS IVF index
-            logger.info(f"Creating new IVF index with {n_regions} regions")
-            quantizer = faiss.IndexFlatL2(feature_dim)
-            self.index = faiss.IndexIVFFlat(quantizer, feature_dim,
-                                            n_regions, faiss.METRIC_L2)
-
-            # Train index
-            logger.info("Training IVF index...")
-            self.index.train(vectors)
-            logger.info("Index training completed")
-
-            # Add to index
-            self.index.add(vectors)
-            logger.info(f"Total vectors in index: {self.index.ntotal}")
-
-        logger.info(f"Successfully indexed {len(vectors)} vectors")
-
-        self.save(save_path)
-
-    def save(self, index_path: str):
+    def save(self, index_name: str, index_path: str):
         """Save the index data to disk."""
-        faiss.write_index(self.index, index_path)
-        logger.info(f"Saved index with {self.index.ntotal} vectors")
+        faiss.write_index(self.indices[index_name], index_path)
         logger.info(f"Saved index to \"{index_path}\"")
 
 class TextIndexer:

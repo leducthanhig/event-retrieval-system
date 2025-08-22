@@ -15,7 +15,6 @@ DINO_VECTOR_DATA_PATH = f"{DATA_ROOT_DIR}/vectors_{DINO_MODEL.replace('/', '-')}
 
 WHISPER_OUTPUT_PATH = 'data/whisper.json'
 
-FAISS_PRESET = 'high_accuracy'
 CLIP_INDEX_SAVE_PATH = f"{DATA_ROOT_DIR}/index_{CLIP_MODEL}_{CLIP_PRETRAINED}.bin"
 DINO_INDEX_SAVE_PATH = f"{DATA_ROOT_DIR}/index_{DINO_MODEL.replace('/', '-')}.bin"
 

@@ -1,7 +1,7 @@
 import os
 import time
 import logging
-from typing import Literal
+from typing import Literal, Any
 from collections import defaultdict
 
 import numpy as np
@@ -29,7 +29,8 @@ class Retriever:
                  elastic_api_key: str,
                  media_info_index_name: str,
                  transcriptions_index_name: str,
-                 device='cuda' if torch.cuda.is_available() else 'cpu'):
+                 device='cuda' if torch.cuda.is_available() else 'cpu',
+        ):
         self.metadata = metadata
         self.media_info_index_name = media_info_index_name
         self.transcriptions_index_name = transcriptions_index_name
@@ -45,7 +46,7 @@ class Retriever:
         self.dino_model_name = dino_model_name
 
         # Initialize containers
-        self.indices = {}
+        self.indices: dict[str, faiss.IndexFlatIP] = {}
         self.clip_model = defaultdict(defaultdict)
         self.dino_model = None
         self.dino_processor = None
@@ -144,15 +145,6 @@ class Retriever:
         logger.info(f"Loading index from {index_path}")
         index_name = os.path.splitext(os.path.basename(index_path))[0].removeprefix('index_')
         self.indices[index_name] = faiss.read_index(index_path)
-
-        # Determine index type from loaded index
-        if isinstance(self.indices[index_name], faiss.IndexFlatL2):
-            logger.info("Loaded a Flat index")
-        elif isinstance(self.indices[index_name], faiss.IndexIVFFlat):
-            logger.info("Loaded an IVF index")
-        else:
-            logger.warning(f"Loaded index of unknown type: {type(self.indices[index_name])}")
-
         logger.info(f"Loaded index with {self.indices[index_name].ntotal} vectors")
 
     @torch.no_grad()
@@ -180,36 +172,26 @@ class Retriever:
         features = features.cpu().numpy()
         return self.vector_search(features, index_name, k)
 
-    def vector_search(self,
-                      query_vector: np.ndarray,
-                      index_name: str,
-                      k=10,
-                      nprobe: int | None = None):
+    def vector_search(self, query_vector: np.ndarray, index_name: str, k=10):
         """Perform vector search on Faiss index."""
         index = self.get_index(index_name)
-
-        if isinstance(index, faiss.IndexIVFFlat):
-            if not nprobe:
-                nprobe = 10
-            index.nprobe = nprobe
-            logger.info(f"Set nprobe to {nprobe}")
 
         # Search index
         k = min(k, index.ntotal)
         start = time.time()
-        distances, indices = index.search(query_vector.reshape(1, -1), k)
+        similarities, indices = index.search(query_vector.reshape(1, -1), k)
         search_time = time.time() - start
 
         # Prepare results
-        results = [(self.metadata[idx], float(dist))
-                   for dist, idx in zip(distances[0], indices[0])]
+        results = [(self.metadata[idx], sim)
+                   for sim, idx in zip(similarities[0], indices[0])]
         if not results:
             logger.warning("No matches found!")
         else:
             logger.info(f"Found {len(results)} matches in {search_time} second(s).")
 
         # Normalize before returning
-        return Retriever.normalize_consine_distances(results)
+        return Retriever.normalize_scores(results)
 
     def media_info_search(self, text_query: str, k=10) -> list[tuple[str, float]]:
         """Search for relevant media info."""
@@ -261,7 +243,7 @@ class Retriever:
             logger.info(f"Found {len(results)} matches in {response['took'] / 1000} second(s).")
 
         # Normalize before returning
-        return Retriever.normalize_bm25_scores(results)
+        return Retriever.normalize_scores(results)
 
     @staticmethod
     def combine_frame_results(all_results: list[list[tuple[str, float]]],
@@ -387,21 +369,15 @@ class Retriever:
         return combined_results
 
     @staticmethod
-    def normalize_consine_distances(results: list[tuple[str, float]]) -> list[tuple[str, float]]:
-        """Normalize Consine distances from vector search results."""
-        distances = np.array([dis for _, dis in results])
-        dis_min = distances.min()
-        dis_max = distances.max()
-        dis_range = dis_max - dis_min
-        return [(path, 1 - (dis - dis_min) / dis_range)
-                for path, dis in results]
-
-    @staticmethod
-    def normalize_bm25_scores(results: list[tuple[dict, float]]) -> list[tuple[dict, float]]:
-        """Normalize BM25 scores from full-text search results."""
+    def normalize_scores(results: list[tuple[Any, float]]) -> list[tuple[Any, float]]:
+        """Normalize scores from search results."""
         scores = np.array([score for _, score in results])
         score_min = scores.min()
         score_max = scores.max()
         score_range = score_max - score_min
-        return [(path, (score - score_min) / score_range)
-                for path, score in results]
+
+        if score_range == 0:  # Handle the case where all scores are the same
+            return [(candidate, 1.0) for candidate, _ in results]
+
+        return [(candidate, (score - score_min) / score_range)
+                for candidate, score in results]
