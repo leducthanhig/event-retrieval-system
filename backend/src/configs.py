@@ -27,7 +27,7 @@ MEDIA_INFO_INDEX_NAME = 'media-info'
 TRANSCRIPTION_INDEX_NAME = 'l25-transcription'
 
 STATIC_IMAGE_PATH = 'images'
-STATIC_VIDEO_PATH = 'videos'
+STATIC_VIDEO_PATH = 'https://huggingface.co/datasets/leducthanhig/hcmc-aic-2025/resolve/main/videos'
 
 CLIP_MODELS = [
     ('ViT-B-16-SigLIP2-384', 'webli'),
