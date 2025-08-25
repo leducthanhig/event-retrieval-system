@@ -5,7 +5,7 @@ from tqdm import tqdm
 from shutil import rmtree
 from torch.cuda import is_available
 
-from utils import get_avg_fps, get_nvidia_decoder, get_video_codec
+from utils import get_avg_fps, get_decoder, get_video_codec
 from configs import (
     VIDEO_METADATA_PATH,
     WHISPER_OUTPUT_PATH,
@@ -47,17 +47,14 @@ def extract_frames(video_path: str, root_dir: str, shots: list[list[int]], use_g
     # Build select filter for all frames at once
     select_conditions = '+'.join([f"eq(n,{pos})" for pos in all_positions])
 
-    # Use a single ffmpeg call to extract all frames
-    if use_gpu:
-        codec_name = get_video_codec(video_path)
-        nvidia_decoder = get_nvidia_decoder(codec_name)
-        input_stream = ffmpeg.input(video_path, hwaccel='cuda', vcodec=nvidia_decoder)
-    else:
-        input_stream = ffmpeg.input(video_path)
-
     # Extract all frames in one operation
+    decoder = get_decoder(video_path, use_gpu)
+    configs = {'vcodec': decoder}
+    if use_gpu and decoder.endswith('cuvid'):
+        configs['hwaccel'] = 'cuda'
     (
-        input_stream
+        ffmpeg
+        .input(video_path, **configs)
         .filter('select', select_conditions)
         .output(os.path.join(temp_dir, 'frame_%06d.jpg'), vsync=0)
         .run(quiet=True)

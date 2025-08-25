@@ -10,7 +10,7 @@ from tqdm import tqdm
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' # to disable the warning message
 from transnetv2 import TransNetV2
 
-from utils import get_nvidia_decoder, get_video_codec
+from utils import get_decoder
 
 logger = logging.getLogger(__name__)
 
@@ -93,17 +93,14 @@ class FrameSampler:
             # Build select filter for all frames at once
             select_conditions = '+'.join([f"eq(n,{pos})" for pos in all_positions])
 
-            # Use a single ffmpeg call to extract all frames
-            if self.use_gpu:
-                codec_name = get_video_codec(video_path)
-                nvidia_decoder = get_nvidia_decoder(codec_name)
-                input_stream = ffmpeg.input(video_path, hwaccel='cuda', vcodec=nvidia_decoder)
-            else:
-                input_stream = ffmpeg.input(video_path)
-
             # Extract all frames in one operation
+            decoder = get_decoder(video_path, self.use_gpu)
+            configs = {'vcodec': decoder}
+            if self.use_gpu and decoder.endswith('cuvid'):
+                configs['hwaccel'] = 'cuda'
             (
-                input_stream
+                ffmpeg
+                .input(video_path, **configs)
                 .filter('select', select_conditions)
                 .output(os.path.join(temp_dir, 'frame_%06d.jpg'), vsync=0)
                 .run(quiet=True)
@@ -193,28 +190,19 @@ class FrameSampler:
     def predict_video(self, video_file: str):
         """Make predictions for the given video."""
         try:
-            if self.use_gpu:
-                codec_name = get_video_codec(video_file)
-                nvidia_decoder = get_nvidia_decoder(codec_name)
-                if nvidia_decoder is None:
-                    msg = f"Unsupported codec: {codec_name}"
-                    logger.error(msg)
-                    raise RuntimeError(msg)
+            decoder = get_decoder(video_file, self.use_gpu)
+            configs = {'vcodec': decoder}
+            if self.use_gpu and decoder.endswith('cuvid'):
+                configs['hwaccel'] = 'cuda'
 
-                video_stream, _ = (
-                    ffmpeg
-                    .input(video_file, hwaccel='cuda', vcodec=nvidia_decoder)
-                    .output("pipe:", format="rawvideo", pix_fmt="rgb24", s="48x27")
-                    .run(capture_stdout=True, capture_stderr=True)
-                )
-            else:
-                video_stream, _ = (
-                    ffmpeg
-                    .input(video_file)
-                    .output("pipe:", format="rawvideo", pix_fmt="rgb24", s="48x27")
-                    .run(capture_stdout=True, capture_stderr=True)
-                )
-            frames = np.frombuffer(video_stream, np.uint8).reshape([-1, 27, 48, 3])
+            video_stream, err = (
+                ffmpeg
+                .input(video_file, **configs)
+                .output('pipe:', format='rawvideo', pix_fmt='rgb24', s='48x27')
+                .run(capture_stdout=True, capture_stderr=True)
+            )
+
+            frames = np.frombuffer(video_stream, np.uint8).reshape((-1, 27, 48, 3))
 
         except ffmpeg.Error as e:
             err = e.stderr.decode() if hasattr(e, 'stderr') else e
