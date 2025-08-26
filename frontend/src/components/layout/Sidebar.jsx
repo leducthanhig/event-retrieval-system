@@ -37,7 +37,7 @@ export default function Sidebar(props) {
         }}
       >
         {/* Header */}
-        <div style={{ 
+        <div style={{
           padding: '16px 12px 8px 12px',
           position: 'sticky',
           top: 0,
@@ -56,8 +56,8 @@ export default function Sidebar(props) {
 
           {/* Search Mode Tabs */}
           <div style={{ marginTop: 14 }}>
-            <SearchModeTabs 
-              activeTabs={activeTabs} 
+            <SearchModeTabs
+              activeTabs={activeTabs}
               setActiveTabs={setActiveTabs}
               modalityWeights={modalityWeights}
               setModalityWeights={setModalityWeights}
@@ -147,8 +147,8 @@ export default function Sidebar(props) {
           }}
         >
           <button
-              onClick={() => 
-                onSearch({ 
+              onClick={() =>
+                onSearch({
                   modes: {
                     text: activeTabs.includes('text'),
                     image: activeTabs.includes('image'),
@@ -178,14 +178,13 @@ export default function Sidebar(props) {
             <button
               onClick={onRewrite}
               disabled={loading || isRewriting || !activeTabs.includes('text')}
-              style={{ 
+              style={{
                 width: '100%',
                 padding: '8px 10px',
                 fontSize: 16,
                 fontWeight: 600,
                 borderRadius: 18,
                 //border: '1px solid #d1d5db',
-                backgroundColor: '#1a1a1a',
                 color: 'white',
                 backgroundColor: (loading || isRewriting || !activeTabs.includes('text')) ? '#2d2d2d' : '#1a1a1a',
                 cursor: (loading || isSearching || !activeTabs.includes('text')) ? 'not-allowed' : 'pointer',
