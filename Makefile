@@ -19,6 +19,9 @@ setup:
 start-backend:
 	fastapi dev backend/src/app.py
 
+start-backend-prod:
+	fastapi run backend/src/app.py
+
 start-frontend:
 	npm run dev --prefix frontend
 
