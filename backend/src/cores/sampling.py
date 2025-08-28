@@ -10,7 +10,7 @@ from tqdm import tqdm
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' # to disable the warning message
 from transnetv2 import TransNetV2
 
-from utils import get_decoder
+from utils import get_decoder, get_avg_fps
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +241,7 @@ class FrameSampler:
             # Save start timestamps of each shot to metadata
             video_id = os.path.splitext(os.path.basename(video_path))[0]
             self.metadata[video_id]['shots'] = [shot[0] for shot in shots.tolist()]
+            self.metadata[video_id]['fps'] = get_avg_fps(video_path)
 
             # Extract frames from each shot
             num_frames = self.extract_frames(video_path, shots)

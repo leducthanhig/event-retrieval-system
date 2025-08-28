@@ -14,7 +14,6 @@ from google.genai import types
 from PIL import Image
 
 from cores.retrieving import Retriever
-from utils import get_avg_fps
 
 from configs import (
     INP_VIDEO_DIR,
@@ -75,6 +74,7 @@ class ShotResponse(BaseModel):
     video_path: str
     start: float
     end: float
+    fps: float
 
 class RewriteRequest(BaseModel):
     text: str
@@ -215,7 +215,7 @@ class App(FastAPI):
                 raise RuntimeError(msg)
 
             path = video_metadata['path']
-            fps = get_avg_fps(path)
+            fps = video_metadata['fps']
             start = shots[idx] / fps
             end = None if idx == len(shots) - 1 else (shots[idx + 1] - 1) / fps
             public_path = path.replace(INP_VIDEO_DIR, STATIC_VIDEO_PATH)

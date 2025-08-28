@@ -5,7 +5,7 @@ from tqdm import tqdm
 from shutil import rmtree
 from torch.cuda import is_available
 
-from utils import get_avg_fps, get_decoder, get_video_codec
+from utils import get_avg_fps, get_decoder
 from configs import (
     VIDEO_METADATA_PATH,
     WHISPER_OUTPUT_PATH,
@@ -111,6 +111,7 @@ for i in tqdm(range(len(data)), total=len(data)):
             metadata[video_id] = {
                 'path': video_path,
                 'shots': [shot[0] for shot in shots],
+                'fps': fps,
             }
 
         # Prepare for the new video
@@ -130,6 +131,7 @@ if all([shots, video_id, video_path, fps]):
     metadata[video_id] = {
         'path': video_path,
         'shots': [shot[0] for shot in shots],
+        'fps': fps,
     }
 
 print(f"Successfully extracted {total_frames} frames")

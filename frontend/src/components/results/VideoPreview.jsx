@@ -1,10 +1,12 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 
 export default function VideoPreview({ data, onClose }) {
   if (!data) return null;
 
   const videoUrl = `http://localhost:8000/${data.video_path}`;
   const videoRef = useRef(null);
+  const frameTime = 1 / data.fps;
+  const [currentFrame, setCurrentFrame] = useState(0); // Track the current frame index
 
   useEffect(() => {
     if (!open) return;
@@ -19,6 +21,7 @@ export default function VideoPreview({ data, onClose }) {
     const handler = () => {
       if (videoRef.current) {
         videoRef.current.currentTime = data.start;
+        setCurrentFrame(Math.floor(data.start / frameTime));
       }
     };
 
@@ -29,7 +32,52 @@ export default function VideoPreview({ data, onClose }) {
         videoRef.current.removeEventListener('loadedmetadata', handler);
       }
     };
-  }, [data]);
+  }, [data, frameTime]);
+
+  useEffect(() => {
+    const updateCurrentFrame = () => {
+      if (videoRef.current) {
+        setCurrentFrame(Math.floor(videoRef.current.currentTime / frameTime));
+      }
+    };
+
+    if (videoRef.current) {
+      videoRef.current.addEventListener('timeupdate', updateCurrentFrame);
+    }
+
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.removeEventListener('timeupdate', updateCurrentFrame);
+      }
+    };
+  }, [frameTime]);
+
+  const handleKeyDown = (e) => {
+    if (!videoRef.current || !videoRef.current.paused) return;
+
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault(); // Prevent default behavior
+      // Seek one frame back
+      const newTime = Math.max(0, videoRef.current.currentTime - frameTime);
+      videoRef.current.currentTime = newTime;
+      setCurrentFrame(Math.floor(newTime / frameTime));
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault(); // Prevent default behavior
+      // Seek one frame forward
+      const newTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + frameTime);
+      videoRef.current.currentTime = newTime;
+      setCurrentFrame(Math.floor(newTime / frameTime));
+    }
+  };
+
+  const goToFrame = () => {
+    if (videoRef.current) {
+      const newTime = currentFrame * frameTime;
+      videoRef.current.currentTime = Math.min(videoRef.current.duration, Math.max(0, newTime));
+      setCurrentFrame(currentFrame);
+      videoRef.current.focus(); // Refocus the video element
+    }
+  };
 
   return (
     <div style={backdropStyle} onClick={onClose}>
@@ -42,13 +90,45 @@ export default function VideoPreview({ data, onClose }) {
         </div>
 
         {videoUrl ? (
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            controls
-            autoPlay
-            style={{ width: '100%', borderRadius: 6 }}
-          />
+          <>
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              controls
+              autoPlay
+              style={{ width: '100%', borderRadius: 6 }}
+              onKeyDownCapture={handleKeyDown} // Add the keydown event listener here
+              tabIndex="0" // Ensure the video element is focusable
+            />
+            <div style={{ marginTop: 8, color: '#fff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginTop: 8 }}>
+                <label style={{ marginRight: 8 }}>Frame:</label>
+                <input
+                  type="number"
+                  value={currentFrame}
+                  onChange={(e) => setCurrentFrame(Number(e.target.value))}
+                  style={{
+                    marginRight: 8,
+                    padding: '4px',
+                    borderRadius: '4px',
+                    border: '1px solid #ccc'
+                  }}
+                />
+                <button
+                  onClick={goToFrame}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    background: '#4caf50',
+                    color: '#fff',
+                    border: 'none'
+                  }}
+                >
+                  Go
+                </button>
+              </div>
+            </div>
+          </>
         ) : (
           <div>No video URL found for this result.</div>
         )}
