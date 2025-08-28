@@ -3,7 +3,7 @@ import logging
 from cores.sampling import FrameSampler
 
 from configs import (
-    INP_VIDEO_DIR,
+    VIDEO_DIR,
     VIDEO_METADATA_PATH,
     OUT_FRAME_DIR,
 )
@@ -15,5 +15,5 @@ logging.basicConfig(
 )
 
 if __name__ == '__main__':
-    sampler = FrameSampler(INP_VIDEO_DIR, OUT_FRAME_DIR, VIDEO_METADATA_PATH)
+    sampler = FrameSampler(VIDEO_DIR, OUT_FRAME_DIR, VIDEO_METADATA_PATH)
     sampler.run()

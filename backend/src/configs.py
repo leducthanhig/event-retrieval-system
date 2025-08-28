@@ -1,6 +1,6 @@
 DATA_ROOT_DIR = 'data'
 
-INP_VIDEO_DIR = f"{DATA_ROOT_DIR}/videos"
+VIDEO_DIR = f"{DATA_ROOT_DIR}/videos"
 OUT_FRAME_DIR = f"{DATA_ROOT_DIR}/keyframes"
 VIDEO_METADATA_PATH = f"{DATA_ROOT_DIR}/metadata.json"
 
@@ -27,7 +27,7 @@ MEDIA_INFO_INDEX_NAME = 'media-info'
 TRANSCRIPTION_INDEX_NAME = 'l25-transcription'
 
 STATIC_IMAGE_PATH = 'images'
-STATIC_VIDEO_PATH = 'https://huggingface.co/datasets/leducthanhig/hcmc-aic-2025/resolve/main/videos'
+STATIC_VIDEO_PATH = 'videos'
 
 CLIP_MODELS = [
     ('ViT-B-16-SigLIP2-384', 'webli'),

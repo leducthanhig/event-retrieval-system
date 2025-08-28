@@ -9,7 +9,7 @@ from utils import get_avg_fps, get_decoder
 from configs import (
     VIDEO_METADATA_PATH,
     WHISPER_OUTPUT_PATH,
-    INP_VIDEO_DIR,
+    VIDEO_DIR,
     OUT_FRAME_DIR,
 )
 
@@ -91,6 +91,7 @@ def extract_frames(video_path: str, root_dir: str, shots: list[list[int]], use_g
     rmtree(temp_dir, ignore_errors=True)
     return total_frames
 
+
 with open(VIDEO_METADATA_PATH) as f:
     metadata = json.load(f)
 
@@ -117,7 +118,7 @@ for i in tqdm(range(len(data)), total=len(data)):
         # Prepare for the new video
         shots = []
         video_id = data[i]['video_id']
-        video_path = os.path.join(INP_VIDEO_DIR, f"{video_id}.mp4")
+        video_path = os.path.join(VIDEO_DIR, f"{video_id}.mp4")
         fps = get_avg_fps(video_path)
 
     shots.append([

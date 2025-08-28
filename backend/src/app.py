@@ -7,6 +7,7 @@ from typing import Literal
 from fastapi import FastAPI, UploadFile, File, Query, Form, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from google import genai
@@ -16,7 +17,7 @@ from PIL import Image
 from cores.retrieving import Retriever
 
 from configs import (
-    INP_VIDEO_DIR,
+    VIDEO_DIR,
     OUT_FRAME_DIR,
     VIDEO_METADATA_PATH,
     PROCESSED_FRAME_DATA_PATH,
@@ -218,9 +219,23 @@ class App(FastAPI):
             fps = video_metadata['fps']
             start = shots[idx] / fps
             end = None if idx == len(shots) - 1 else (shots[idx + 1] - 1) / fps
-            public_path = path.replace(INP_VIDEO_DIR, STATIC_VIDEO_PATH)
 
-            return ShotResponse(video_path=public_path, start=start, end=end)
+            return ShotResponse(video_path=path, start=start, end=end, fps=fps)
+
+        @self.get(f"/{STATIC_VIDEO_PATH}", response_class=FileResponse)
+        async def get_video(url: str):
+            """
+            Check if the file is available locally. If not, redirect to the remote URL.
+            """
+            # Check if the file exists locally
+            file_name = os.path.basename(url)
+            local_file_path = os.path.join(VIDEO_DIR, file_name)
+            if os.path.exists(local_file_path) and os.path.isfile(local_file_path):
+                # Serve the local file
+                return FileResponse(local_file_path)
+
+            # If the file doesn't exist locally, redirect to the remote URL
+            return RedirectResponse(url=url)
 
         @self.post('/rewrite')
         async def rewrite(req: RewriteRequest) -> RewriteResponse:
@@ -398,7 +413,6 @@ origins = [
 
 mount_paths = [
     (f"/{STATIC_IMAGE_PATH}", OUT_FRAME_DIR),
-    (f"/{STATIC_VIDEO_PATH}", INP_VIDEO_DIR),
 ]
 
 app = App(origins, mount_paths)

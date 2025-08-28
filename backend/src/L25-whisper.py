@@ -3,10 +3,10 @@ import json
 from tqdm import tqdm
 from faster_whisper import WhisperModel
 
-from configs import INP_VIDEO_DIR, WHISPER_OUTPUT_PATH
+from configs import VIDEO_DIR, WHISPER_OUTPUT_PATH
 
-file_paths = sorted([os.path.join(INP_VIDEO_DIR, file)
-                     for file in os.listdir(INP_VIDEO_DIR)
+file_paths = sorted([os.path.join(VIDEO_DIR, file)
+                     for file in os.listdir(VIDEO_DIR)
                      if file.startswith('L25')])
 
 model = WhisperModel('small', device='cuda', compute_type='float32', num_workers=8)

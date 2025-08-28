@@ -40,9 +40,8 @@ class FrameSampler:
 
     def extract_frames(self, video_path: str, shots: np.ndarray):
         """Extract keyframes from detected shots."""
-        video_relpath = os.path.relpath(video_path, self.video_root_dir)
-        video_relpath_splitext = os.path.splitext(video_relpath)[0]
-        shot_root_dir = os.path.join(self.output_root_dir, video_relpath_splitext)
+        video_id = os.path.splitext(os.path.basename(video_path))[0]
+        shot_root_dir = os.path.join(self.output_root_dir, video_id)
         os.makedirs(shot_root_dir, exist_ok=True)
 
         # Calculate all frame positions to extract

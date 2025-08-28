@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 export default function VideoPreview({ data, onClose }) {
   if (!data) return null;
 
-  const videoUrl = `http://localhost:8000/${data.video_path}`;
+  const videoUrl = `/videos?url=${data.video_path}`;
   const videoRef = useRef(null);
   const frameTime = 1 / data.fps;
   const [currentFrame, setCurrentFrame] = useState(0); // Track the current frame index

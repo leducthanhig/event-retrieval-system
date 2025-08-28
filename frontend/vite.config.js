@@ -9,6 +9,7 @@ export default defineConfig({
       '/search':  { target: 'http://localhost:8000', changeOrigin: true },
       '/shots':   { target: 'http://localhost:8000', changeOrigin: true },
       '/images':  { target: 'http://localhost:8000', changeOrigin: true },
+      '/videos':  { target: 'http://localhost:8000', changeOrigin: true },
     },
   },
 })
