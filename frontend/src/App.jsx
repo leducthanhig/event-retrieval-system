@@ -142,6 +142,7 @@ export default function App() {
           if (Number.isNaN(rounded) || rounded !== 1.0) {
             return failSearch('Weights must sum exactly to 1.');
           }
+          fd.append('model_weights', JSON.stringify(ws));
         }
       }
 
