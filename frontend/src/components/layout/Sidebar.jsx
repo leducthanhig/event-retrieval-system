@@ -174,7 +174,7 @@ export default function Sidebar(props) {
                 flex: 6,
               }}
             >
-              {isSearching ? 'Searching' : 'Search'}
+              Search
             </button>
 
             {/* Input top-k*/}
@@ -184,7 +184,7 @@ export default function Sidebar(props) {
               max={500}
               value={topK}
               onChange={(e) => setTopK(e.target.value)}
-              title="Top-k (1–500)"
+              title="Top-K (1-500)"
               style={{
                 width: 65,
                 padding: '8px 8px',

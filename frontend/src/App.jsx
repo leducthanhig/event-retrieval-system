@@ -125,7 +125,7 @@ export default function App() {
       // Validate top-k
       const k = parseInt(topK, 10);
       if (Number.isNaN(k) || k <= 0 || k > 500) {
-        return failSearch('Top-k must be an integer between 1 and 500.');
+        return failSearch('Top-K must be an integer between 1 and 500.');
       }
 
       // TEXT branch

@@ -3,7 +3,7 @@ import '../../styles/results.css';
 import ResultsGrid from '../results/ResultsGrid';
 import VideoPreviewModal from '../results/VideoPreview';
 
-export default function ResultsPane({ results, onSelect, selectedItem, onClosePreview, onSimilarSearch, error }) {
+export default function ResultsPane({ results, onSelect, selectedItem, onClosePreview, onSimilarSearch, isSearching, error }) {
   
   const [groupByVideo, setGroupByVideo] = useState(false);
   const [groupSortKey, setGroupSortKey] = useState('score');
@@ -46,7 +46,7 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
   }, [groupByVideo, groupSortKey, results]);
 
   return (
-    <main className="ner-results">
+    <main className="ner-results" aria-busy={isSearching ? 'true' : 'false'}>
       {/* Top bar */}  
       <div className="results-topbar">
         <label className="topbar-item">
@@ -73,6 +73,13 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
       </div>
 
       <div className="results-scroll">
+        {isSearching && (
+          <div className="results-overlay" aria-hidden="true">
+            <div className="results-spinner" />
+            <div className="results-searching__text">Searching</div>
+          </div>
+        )}
+
         {error ? (
           <div className="error-box">{error}</div>
         ) : null}

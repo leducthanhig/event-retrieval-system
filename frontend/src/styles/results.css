@@ -130,3 +130,45 @@
 .result-card .action-btn:hover {
   border-color: #646cff !important;
 }
+
+.results-searching {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px 12px;
+  color: #e2e8f0;
+}
+
+.results-spinner {
+  width: 48px;
+  height: 48px;
+  border: 5px solid rgba(226, 232, 240, 0.25); /* slate-200/25 */
+  border-top-color: #e2e8f0;                   /* slate-200 */
+  border-radius: 50%;
+  animation: rs-spin 0.8s linear infinite;
+}
+
+@keyframes rs-spin {
+  to { transform: rotate(360deg); }
+}
+
+.results-searching__text {
+  font-size: 20px;
+  opacity: 1;
+}
+
+.results-scroll { position: relative; }
+
+.results-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.8);
+  z-index: 5;
+}

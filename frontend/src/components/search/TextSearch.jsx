@@ -77,18 +77,18 @@ export default function TextSearch({ query, setQuery, onSearch, onRewrite, isRew
         }}
       />
 
-      <FontAwesomeIcon
-        icon={faWandMagicSparkles}
-        title='Rewrite query'
-        className={`rewrite-icon-svg${disableRewrite ? ' disabled' : ''}`}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => !disableRewrite && onRewrite?.(query)}
-        aria-hidden="true"
-      />
-
-      {isRewriting && (
-        <div className="query-overlay" aria-hidden="true">
-          <FontAwesomeIcon icon={faCircleNotch} className="query-overlay-spinner" spin />
+      {!isRewriting ? (
+        <FontAwesomeIcon
+          icon={faWandMagicSparkles}
+          title='Rewrite query'
+          className={`rewrite-icon-svg${disableRewrite ? ' disabled' : ''}`}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => !disableRewrite && onRewrite?.(query)}
+          aria-hidden="true"
+        />
+      ) : (
+        <div className="rewrite-icon-svg">
+          <div className="rewrite-spinner" aria-hidden="true"></div>
         </div>
       )}
 

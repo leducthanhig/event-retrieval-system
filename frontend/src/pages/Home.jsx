@@ -46,6 +46,7 @@ export default function Home(props) {
         selectedItem={selectedItem}
         onClosePreview={() => setSelectedItem(null)}
         onSimilarSearch={onSimilarSearch}
+        isSearching={isSearching}
         error={error}
       />
     </div>
