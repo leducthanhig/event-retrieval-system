@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import InfoModal from './InfoModal';
 import VideoPreview from './VideoPreview';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faInfo, faPlay, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 
 // Render one thumbnail + action area below (info + preview buttons)
 export default function ResultCard({ item, onSelect, onSimilarSearch }) {
@@ -53,7 +55,7 @@ export default function ResultCard({ item, onSelect, onSimilarSearch }) {
           title="Show Info"
           onClick={() => setOpenInfo(true)}
         >
-          ℹ️
+          <FontAwesomeIcon icon={faInfo} />
         </button>
 
         <button
@@ -61,7 +63,7 @@ export default function ResultCard({ item, onSelect, onSimilarSearch }) {
           title="Preview Video"
           onClick={handlePreview}
         >
-          ▶️
+          <FontAwesomeIcon icon={faPlay} />
         </button>
 
         <button
@@ -69,7 +71,7 @@ export default function ResultCard({ item, onSelect, onSimilarSearch }) {
           title="Similar Search"
           onClick={handleSimilarSearch}
         >
-          🔍
+          <FontAwesomeIcon icon={faMagnifyingGlass} />
         </button>
       </div>
 
