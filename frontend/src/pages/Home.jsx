@@ -14,6 +14,8 @@ export default function Home(props) {
     loading, error,
     isSearching, isRewriting,
     selectedItem,
+    temporalMode,
+    setTemporalMode,
     onSimilarSearch,
   } = props;
 
@@ -37,6 +39,9 @@ export default function Home(props) {
         loading={loading}
         isSearching={isSearching}
         isRewriting={isRewriting}
+        temporalMode={temporalMode}
+        setTemporalMode={setTemporalMode}
+        results={results}
         error={error}
       />
 

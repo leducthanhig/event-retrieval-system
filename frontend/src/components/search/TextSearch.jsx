@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
-import { faCircleNotch } from '@fortawesome/free-solid-svg-icons';
 
 export default function TextSearch({ query, setQuery, onSearch, onRewrite, isRewriting, loading }) {
   const taRef = useRef(null);

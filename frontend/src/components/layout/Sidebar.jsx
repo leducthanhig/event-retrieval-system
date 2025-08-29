@@ -7,6 +7,9 @@ import ImageSearch from '../search/ImageSearch';
 import MetaSearch from '../search/MetaSearch';
 import TranscriptSearch from '../search/TranscriptSearch';
 
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faClock as faClockRegular } from '@fortawesome/free-regular-svg-icons';
+
 export default function Sidebar(props) {
   const {
     query, setQuery,
@@ -19,11 +22,16 @@ export default function Sidebar(props) {
     onRewrite,
     loading, error,
     isSearching, isRewriting,
+    temporalMode, setTemporalMode,
+    results,
   } = props;
 
   const [imageFile, setImageFile] = useState(null);
   const [transcriptQuery, setTranscriptQuery] = useState('');
   const [metadataQuery, setMetadataQuery] = useState('');
+
+  const hasResults = Array.isArray(results) && results.length > 0;
+  const clockDisabled = !hasResults || isSearching || isRewriting;
 
   return (
     <aside className="ner-sidebar sidebar-scroll">
@@ -146,6 +154,7 @@ export default function Sidebar(props) {
             zIndex: 2,
             display: 'flex',
             gap: 8,
+            alignItems: 'center',
           }}
         >
           <button
@@ -177,6 +186,23 @@ export default function Sidebar(props) {
               Search
             </button>
 
+            {/* Temporal search toggle */}
+            <button
+              type="button"
+              onClick={() => !clockDisabled && setTemporalMode(v => !v)}
+              disabled={clockDisabled}
+              title={ clockDisabled
+                ? "Temporal search requires existing results"
+                : temporalMode
+                ? "Temporal ON"
+                : "Temporal OFF"
+              }
+              aria-pressed={temporalMode}
+              className={`clock-btn ${temporalMode ? "active" : ""} ${clockDisabled ? "disabled" : ""}`}
+            >
+              <FontAwesomeIcon icon={faClockRegular} size="lg" />
+            </button>
+
             {/* Input top-k*/}
             <input
               type="number"
@@ -187,10 +213,11 @@ export default function Sidebar(props) {
               title="Top-K (1-500)"
               style={{
                 width: 65,
-                padding: '8px 8px',
+                height: 36,
+                padding: '0px 8px',
                 fontSize: 14,
                 borderRadius: 4,
-                border: '0.7px solid #d1d5db',
+                border: '0.5px solid #d1d5dbc7',
                 backgroundColor: '#111827',
                 color: '#f9fafb',
                 boxSizing: 'border-box',

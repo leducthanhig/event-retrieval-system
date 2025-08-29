@@ -107,3 +107,31 @@ button:focus {
 @keyframes rewrite-spin {
   to { transform: rotate(360deg); }
 }
+
+.clock-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background-color: #1a1a1a;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.clock-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1); /* 🔹 nền trắng mờ */
+  border: 1px solid transparent; /* bỏ border */
+}
+
+.clock-btn.active {
+  background-color: #1241de;
+}
+
+.clock-btn.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -18,6 +18,9 @@ export default function App() {
   const [results, setResults] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null); // for preview modal/video
 
+  // temporal search toggle
+  const [temporalMode, setTemporalMode] = useState(false); 
+
   // Weights for different modalities
   const [modalityWeights, setModalityWeights] = useState({
     text: 1.0,
@@ -32,7 +35,7 @@ export default function App() {
     setActiveTabs(prev => {
       const on = prev.includes(id);
       const next = on ? prev.filter(t => t !== id) : [...prev, id];
-      // sync weight về 0 khi tắt
+      // sync weight 0 when off
       if (on) setModalityWeights(w => ({ ...w, [id]: 0.0 }));
       return next;
     });
@@ -58,6 +61,7 @@ export default function App() {
   const clearResults = () => {
     setResults([]);
     setSelectedItem(null);
+    setTemporalMode(false);
   };
 
   // Unified way to fail a search: set error, clear results, stop spinner
@@ -175,13 +179,22 @@ export default function App() {
       // Pooling & top
       fd.append('pooling_method', 'max');
 
+      // Attach previous_results for Temporal Search
+      if (temporalMode && results && results.length > 0) {
+        fd.append('previous_results', JSON.stringify(results)); 
+      }
+
       const url = `/search?top=${k || 100}`;
       const res = await fetch(url, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`Search failed with status ${res.status}`);
       const data = await res.json();
       setResults(data?.results || []);
+
+      // Keep temporal mode ON until user toggles it off
+      if (temporalMode) setTemporalMode(false);
+
     } catch (e) {
-      console.error('Unified search error:', e);
+      console.error('Search error:', e);
       clearResults();
       setError('Error calling API: ' + (e?.message || 'unknown'));
     } finally {
@@ -244,6 +257,8 @@ export default function App() {
       isRewriting={isRewriting}
       error={error}
       selectedItem={selectedItem}
+      temporalMode={temporalMode}
+      setTemporalMode={setTemporalMode}
       onSimilarSearch={(file) =>
         handleSearch({
           modes: { text: false, image: true, transcription: false, metadata: false },
