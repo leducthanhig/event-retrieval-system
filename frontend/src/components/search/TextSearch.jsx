@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
+import { faCircleNotch } from '@fortawesome/free-solid-svg-icons';
 
-export default function TextSearch({ query, setQuery, onSearch, loading, error, compact, }) {
+export default function TextSearch({ query, setQuery, onSearch, onRewrite, isRewriting, loading }) {
   const taRef = useRef(null);
   const [reachedMax, setReachedMax] = useState(false);
   const [maxPx, setMaxPx] = useState(() => Math.floor(window.innerHeight * 0.4));
@@ -40,10 +43,10 @@ export default function TextSearch({ query, setQuery, onSearch, loading, error, 
     }
   };
 
-  const disabled = loading;
+  const disableRewrite = loading || isRewriting || !query?.trim();
 
   return (
-    <div>
+    <div className="query-field">
       <textarea
         className="query-textarea"
         ref={taRef}
@@ -51,15 +54,18 @@ export default function TextSearch({ query, setQuery, onSearch, loading, error, 
         placeholder="Enter your text query"
         value={query}
         onChange={handleChange}
-        onInput={autoResize} 
+        onInput={autoResize}
         onKeyDown={handleKeyDown}
         spellCheck={false}
         rows={2}
+        readOnly={isRewriting}
+        aria-busy={isRewriting ? 'true' : 'false'}
+        aria-label="Query"
         style={{ 
           width: '100%', 
           boxSizing: 'border-box',
-          padding: '8px', 
-          borderRadius: compact ? 4 : 6,
+          padding: '8px 36px 8px 8px',
+          borderRadius: 4,
           border: '1px solid #d1d5db',
           marginBottom: 8,
           resize: 'none',                                // auto-resize, user won't drag the corner
@@ -69,8 +75,23 @@ export default function TextSearch({ query, setQuery, onSearch, loading, error, 
           fontFamily: 'inherit',
           fontSize: 14, 
         }}
-        aria-label="Query"
       />
+
+      <FontAwesomeIcon
+        icon={faWandMagicSparkles}
+        title='Rewrite query'
+        className={`rewrite-icon-svg${disableRewrite ? ' disabled' : ''}`}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => !disableRewrite && onRewrite?.(query)}
+        aria-hidden="true"
+      />
+
+      {isRewriting && (
+        <div className="query-overlay" aria-hidden="true">
+          <FontAwesomeIcon icon={faCircleNotch} className="query-overlay-spinner" spin />
+        </div>
+      )}
+
     </div>
   );
 }

@@ -1,0 +1,113 @@
+.ner-sidebar {
+  border-right: none;
+  padding: 0;
+  position: relative;
+  top: 0;
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #1e1e1e;
+}
+
+.sidebar-scroll {
+  max-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable; /* avoid layout shift when show/hidden scrollbar */
+}
+
+.query-textarea { scrollbar-width: thin; }
+.query-textarea::-webkit-scrollbar { width: 6px; }
+.query-textarea { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.query-textarea::-webkit-scrollbar { width: 6px; }
+.query-textarea::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+
+.ner-btn {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  min-width: 90px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background-color: #1a1a1a;
+  color: white;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+
+.ner-btn:hover {
+  border-color: #646cff;
+}
+
+.ner-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.action-btn:focus,
+.ner-btn:focus,
+button:focus {
+  outline: none;
+}
+
+.action-btn {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: transparent;
+}
+
+.query-field {
+  position: relative;
+}
+
+.query-textarea {
+  padding-right: 36px;
+}
+
+.rewrite-icon-svg {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  color: cyan;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 5px;
+  box-sizing: content-box;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.rewrite-icon-svg:hover {
+  color: #ffffff;
+  background: #532d8d;
+}
+
+.rewrite-icon-svg.disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.query-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  pointer-events: all;
+}
+
+.query-overlay-spinner {
+  color: #e2e8f0;
+  font-size: 24px;
+}

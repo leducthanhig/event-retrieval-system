@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import '../../styles/results.css';
 import ResultsGrid from '../results/ResultsGrid';
 import VideoPreviewModal from '../results/VideoPreview';
 

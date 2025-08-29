@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import '../../styles/sidebar.css';
 import SearchModeTabs from '../search/SearchModeTabs';
 import TextSearch from '../search/TextSearch';
 import ModelSelector from '../search/ModelSelector';
@@ -74,8 +75,9 @@ export default function Sidebar(props) {
                 query={query}
                 setQuery={setQuery}
                 onSearch={onSearch}
+                onRewrite={(q) => onRewrite?.(q)}
+                isRewriting={isRewriting}
                 loading={loading}
-                error={error}
                 compact
               />
               <div style={{ marginTop: 4 }}>
@@ -173,26 +175,6 @@ export default function Sidebar(props) {
               }}
             >
               {isSearching ? 'Searching' : 'Search'}
-            </button>
-
-            <button
-              onClick={onRewrite}
-              disabled={loading || isRewriting || !activeTabs.includes('text')}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                fontSize: 16,
-                fontWeight: 600,
-                borderRadius: 18,
-                //border: '1px solid #d1d5db',
-                color: 'white',
-                backgroundColor: (loading || isRewriting || !activeTabs.includes('text')) ? '#2d2d2d' : '#1a1a1a',
-                cursor: (loading || isSearching || !activeTabs.includes('text')) ? 'not-allowed' : 'pointer',
-                opacity: (loading || isRewriting || !activeTabs.includes('text')) ? 0.6 : 1,
-                flex: 1,
-              }}
-            >
-              {isRewriting ? 'Rewriting' : 'R'}
             </button>
 
             {/* Input top-k*/}
