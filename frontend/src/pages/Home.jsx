@@ -10,7 +10,7 @@ export default function Home(props) {
     selectedModels, setSelectedModels,
     weights, setWeights,
     results, setSelectedItem,
-    onSearch, onRewrite, 
+    onSearch, onRewrite,
     loading, error,
     isSearching, isRewriting,
     selectedItem,
@@ -19,39 +19,35 @@ export default function Home(props) {
 
   return (
     <div className="ner-root">
-      <aside className="ner-sidebar">
-        <Sidebar
-          query={query}
-          setQuery={setQuery}
-          topK={topK}
-          setTopK={setTopK}
-          activeTabs={activeTabs}
-          setActiveTabs={setActiveTabs}
-          modalityWeights={modalityWeights}
-          setModalityWeights={setModalityWeights}
-          selectedModels={selectedModels}
-          setSelectedModels={setSelectedModels}
-          weights={weights}
-          setWeights={setWeights}
-          onSearch={onSearch}
-          onRewrite={onRewrite}
-          loading={loading}
-          isSearching={isSearching}
-          isRewriting={isRewriting}
-          error={error}
-        />
-      </aside>
+      <Sidebar
+        query={query}
+        setQuery={setQuery}
+        topK={topK}
+        setTopK={setTopK}
+        activeTabs={activeTabs}
+        setActiveTabs={setActiveTabs}
+        modalityWeights={modalityWeights}
+        setModalityWeights={setModalityWeights}
+        selectedModels={selectedModels}
+        setSelectedModels={setSelectedModels}
+        weights={weights}
+        setWeights={setWeights}
+        onSearch={onSearch}
+        onRewrite={onRewrite}
+        loading={loading}
+        isSearching={isSearching}
+        isRewriting={isRewriting}
+        error={error}
+      />
 
-      <main className="ner-results">
-        <ResultsPane
-          results={results}
-          onSelect={setSelectedItem}
-          selectedItem={selectedItem}
-          onClosePreview={() => setSelectedItem(null)}
-          onSimilarSearch={onSimilarSearch}
-          error={error}
-        />
-      </main>
+      <ResultsPane
+        results={results}
+        onSelect={setSelectedItem}
+        selectedItem={selectedItem}
+        onClosePreview={() => setSelectedItem(null)}
+        onSimilarSearch={onSimilarSearch}
+        error={error}
+      />
     </div>
   );
 }
