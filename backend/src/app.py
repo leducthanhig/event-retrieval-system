@@ -59,6 +59,7 @@ class SearchRequest(BaseModel):
     modality_weights: dict[str, float] | None = None
     pooling_method: Literal['avg', 'max'] = 'max'
     top: int = 10
+    previous_results: list[dict] | None = None
 
 class Shot(BaseModel):
     video_id: str
@@ -183,15 +184,18 @@ class App(FastAPI):
                 if not weights:
                     weights = [1.0 / len(all_results)] * len(all_results)
 
-                fused = Retriever.combine_shot_results(all_results, weights)
+                fused_results = Retriever.combine_shot_results(all_results, weights)
                 if req.top > 0:
-                    fused = fused[:req.top]
-
-                final_results = fused
+                    fused_results = fused_results[:req.top]
             else:
-                final_results = all_results[0]
+                fused_results = all_results[0]
+
+            if req.previous_results:
+                fused_results = Retriever.form_temporal_results(req.previous_results,
+                                                                fused_results)
 
             # Map paths
+            final_results = fused_results
             for shot in final_results:
                 shot['thumbnail'] = shot['thumbnail'].replace(OUT_FRAME_DIR, STATIC_IMAGE_PATH)
 
@@ -382,6 +386,7 @@ class App(FastAPI):
         modality_weights: str | None = Form(None),
         pooling_method: Literal['avg', 'max'] = Form('max'),
         top: int = Query(10),
+        previous_results: str | None = Form(None),
     ):
         """Parse the request body to a `BaseModel` class/subclass instance."""
         parsed_models = None
@@ -396,6 +401,7 @@ class App(FastAPI):
 
         parsed_model_weights = json.loads(model_weights) if model_weights else None
         parsed_modality_weights = json.loads(modality_weights) if modality_weights else None
+        parsed_previous_results = json.loads(previous_results) if previous_results else None
 
         return SearchRequest(text_query=text_query,
                              models=parsed_models,
@@ -405,7 +411,9 @@ class App(FastAPI):
                              metadata_query=metadata_query,
                              modality_weights=parsed_modality_weights,
                              pooling_method=pooling_method,
-                             top=top)
+                             top=top,
+                             previous_results=parsed_previous_results,
+                             )
 
 origins = [
     "http://localhost:5173",

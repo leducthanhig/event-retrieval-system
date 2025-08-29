@@ -369,6 +369,33 @@ class Retriever:
         return combined_results
 
     @staticmethod
+    def form_temporal_results(prev_results: list[dict], cur_results: list[dict]) -> list[dict]:
+        """Filter out-of-order results."""
+        grouped_results = defaultdict(dict)
+        for result in prev_results:
+            video_id = result['video_id']
+            shot_id = result['shot_id']
+            grouped_results[video_id][shot_id] = result
+
+        filtered_results = prev_results[:]
+        for result in cur_results:
+            video_id = result['video_id']
+            if video_id not in grouped_results:
+                continue
+
+            # Filter out out-of-order and duplicated results
+            if result['shot_id'] < min(grouped_results[video_id]) \
+                    or result['shot_id'] in grouped_results[video_id]:
+                continue
+
+            filtered_results.append(result)
+
+        # Sort results by the combined score in descending order
+        filtered_results.sort(key=lambda x: x['score'], reverse=True)
+
+        return filtered_results
+
+    @staticmethod
     def normalize_scores(results: list[tuple[Any, float]]) -> list[tuple[Any, float]]:
         """Normalize scores from search results."""
         scores = np.array([score for _, score in results])
