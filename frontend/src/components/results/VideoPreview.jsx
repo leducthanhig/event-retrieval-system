@@ -8,6 +8,22 @@ export default function VideoPreview({ data, onClose }) {
   const frameTime = 1 / data.fps;
   const [currentFrame, setCurrentFrame] = useState(0); // Track the current frame index
 
+  const getVideoId = (it) => {
+    if (!it) return 'unknown';
+    if (it.video_id) return it.video_id;
+    if (it.videoId) return it.videoId;
+    if (it.video && it.video.id) return it.video.id;
+    if (typeof it.video_path === 'string') {
+      const parts = it.video_path.split(/[\\/]/);
+      const base = parts[parts.length - 1] || '';
+      const noExt = base.replace(/\.[^/.]+$/, '');
+      return noExt || 'unknown';
+    }
+    return 'unknown';
+  };
+
+  const videoId = getVideoId(data);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -83,7 +99,9 @@ export default function VideoPreview({ data, onClose }) {
     <div style={backdropStyle} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <strong>PREVIEW</strong>
+          <strong>
+            {videoId ? `${videoId}` : ''}
+          </strong>
           <div style={{ fontSize: 12, color: '#9ca3af' }}>
             Press 'Esc' or click on backdrop to close
           </div>

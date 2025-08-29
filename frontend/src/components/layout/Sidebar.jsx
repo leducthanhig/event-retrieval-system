@@ -158,72 +158,72 @@ export default function Sidebar(props) {
           }}
         >
           <button
-              onClick={() =>
-                onSearch({
-                  modes: {
-                    text: activeTabs.includes('text'),
-                    image: activeTabs.includes('image'),
-                    transcription: activeTabs.includes('transcription'),
-                    metadata: activeTabs.includes('metadata'),
-                },
-                imageFile,
-                transcriptQuery,
-                metadataQuery,
-                })}
-              disabled={loading || isSearching}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                fontSize: 16,
-                fontWeight: 600,
-                borderRadius: 18,
-                backgroundColor: '#532d8d',
-                color: 'white',
-                cursor: loading || isSearching ? 'not-allowed' : 'pointer',
-                flex: 6,
-              }}
-            >
-              Search
-            </button>
+            onClick={() =>
+              onSearch({
+                modes: {
+                  text: activeTabs.includes('text'),
+                  image: activeTabs.includes('image'),
+                  transcription: activeTabs.includes('transcription'),
+                  metadata: activeTabs.includes('metadata'),
+              },
+              imageFile,
+              transcriptQuery,
+              metadataQuery,
+              })}
+            disabled={loading || isSearching}
+            style={{
+              width: '100%',
+              padding: '8px 10px',
+              fontSize: 16,
+              fontWeight: 600,
+              borderRadius: 18,
+              backgroundColor: '#532d8d',
+              color: 'white',
+              cursor: loading || isSearching ? 'not-allowed' : 'pointer',
+              flex: 6,
+            }}
+          >
+            Search
+          </button>
 
-            {/* Temporal search toggle */}
-            <button
-              type="button"
-              onClick={() => !clockDisabled && setTemporalMode(v => !v)}
-              disabled={clockDisabled}
-              title={ clockDisabled
-                ? "Temporal search requires existing results"
-                : temporalMode
-                ? "Temporal ON"
-                : "Temporal OFF"
-              }
-              aria-pressed={temporalMode}
-              className={`clock-btn ${temporalMode ? "active" : ""} ${clockDisabled ? "disabled" : ""}`}
-            >
-              <FontAwesomeIcon icon={faClockRegular} size="lg" />
-            </button>
+          {/* Temporal search toggle */}
+          <button
+            type="button"
+            onClick={() => !clockDisabled && setTemporalMode(v => !v)}
+            disabled={clockDisabled}
+            title={ clockDisabled
+              ? "Temporal search requires existing results"
+              : temporalMode
+              ? "Temporal ON"
+              : "Temporal OFF"
+            }
+            aria-pressed={temporalMode}
+            className={`clock-btn ${temporalMode ? "active" : ""} ${clockDisabled ? "disabled" : ""}`}
+          >
+            <FontAwesomeIcon icon={faClockRegular} size="lg" />
+          </button>
 
-            {/* Input top-k*/}
-            <input
-              type="number"
-              min={1}
-              max={500}
-              value={topK}
-              onChange={(e) => setTopK(e.target.value)}
-              title="Top-K (1-500)"
-              style={{
-                width: 65,
-                height: 36,
-                padding: '0px 8px',
-                fontSize: 14,
-                borderRadius: 4,
-                border: '0.5px solid #d1d5dbc7',
-                backgroundColor: '#111827',
-                color: '#f9fafb',
-                boxSizing: 'border-box',
-                outline: 'none'
-              }}
-            />
+          {/* Input top-k*/}
+          <input
+            type="number"
+            min={1}
+            max={500}
+            value={topK}
+            onChange={(e) => setTopK(e.target.value)}
+            title="Top-K (1-500)"
+            style={{
+              width: 65,
+              height: 36,
+              padding: '0px 8px',
+              fontSize: 14,
+              borderRadius: 4,
+              border: '0.5px solid #d1d5dbc7',
+              backgroundColor: '#111827',
+              color: '#f9fafb',
+              boxSizing: 'border-box',
+              outline: 'none'
+            }}
+          />
         </div>
       </div>
     </aside>
