@@ -10,7 +10,6 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
   const getVideoId = (it) => it.video_id ?? it.videoId ?? it.video?.id ?? 'unknown';
   const getVideoTitle = (it) => it.video_title ?? it.videoTitle ?? it.video?.name ?? getVideoId(it);
   const getScore = (it) => Number(it.score ?? it.similarity ?? it.rank ?? 0);
-  const getShot = (it) => it.shot_id ?? it.shotId ?? it.shot ?? 0;
   
   const parseShotId = (x) => {
     if (x == null) return Number.MAX_SAFE_INTEGER;
@@ -48,7 +47,7 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
   return (
     <main className="ner-results">
       {/* Top bar */}  
-      <div className="results-topbar" style={{ display: 'flex', width: '100%', background: '#0f172a' }}>
+      <div className="results-topbar">
         <label className="topbar-item">
           <input
             type="checkbox"
@@ -88,20 +87,30 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
         )}
 
         {/* Grouped mode */}
-        {groupByVideo && grouped && grouped.length > 0 && (
-          <div className="grouped-results">
-            {grouped.map((g) => (
-              <section key={g.videoId} className="video-group">
-                <div className="video-group__title">{g.title}</div>
-                <ResultsGrid
-                  results={g.items}
-                  onSelect={onSelect}
-                  onSimilarSearch={onSimilarSearch}
-                  disableInternalSort
-                />
-              </section>
-            ))}
-          </div>
+        {groupByVideo && (
+          grouped && grouped.length > 0 ? (
+            <div className="grouped-results">
+              {grouped.map((g) => (
+                <section key={g.videoId} className="video-group">
+                  <div className="video-group__title">{g.title}</div>
+                  <ResultsGrid
+                    results={g.items}
+                    onSelect={onSelect}
+                    onSimilarSearch={onSimilarSearch}
+                    disableInternalSort
+                  />
+                </section>
+              ))}
+            </div>
+          ) : (
+            <ResultsGrid
+              results={[]}
+              error={error}
+              onSelect={onSelect}
+              onSimilarSearch={onSimilarSearch}
+              disableInternalSort
+            />
+          )
         )}
 
         <VideoPreviewModal 

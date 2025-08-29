@@ -57,15 +57,15 @@ html, body, #root {
   flex: 0 0 auto;
   width: 100%;
   padding: 8px 12px;
-  border-bottom: 0.5px solid #e5e7eb;
-  background: #0f172a;
+  border-bottom: 1px solid #2c2c2c;
+  background: #242424;
   color: #e2e8f0;
 
   display: flex;
   align-self: stretch;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 24px;
   z-index: 1;
   box-sizing: border-box;
 }
@@ -78,9 +78,27 @@ html, body, #root {
 
 .topbar-item { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; }
 
+.results-topbar select {
+  height: 20px;              /* tăng chiều cao box */
+  line-height: 36px;         /* căn giữa chữ theo chiều dọc */
+  padding: 0 2px;            /* padding ngang */
+  border: 1px solid #4b5563;
+  border-radius: 2px;
+  background-color: #1e1e1e;
+  color: #e2e8f0;
+  outline: none;
+  box-shadow: none;
+}
+
+.results-topbar select:focus {
+  outline: none;
+  border: 1px solid #4b5563;
+  border-radius: 2px;
+  box-shadow: none;
+}
+
 .results-topbar { display: flex; }
 .results-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
-
 
 .results-scroll {
   height: 100%;
@@ -92,13 +110,13 @@ html, body, #root {
 }
 
 .error-box {
-  margin: '12px';
-  padding: '8px 12px';
+  margin: 12px;
+  padding: 8px 12px;
   border: 1px solid #7f1d1d;
   background: #431313;
   color: #fecaca;
-  border-radius: 8;
-  font-size: 14;
+  border-radius: 8px;
+  font-size: 14px;
 }
 
 /* Grouped layout wrappers */
