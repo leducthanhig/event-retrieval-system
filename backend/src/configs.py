@@ -4,7 +4,7 @@ VIDEO_DIR = f"{DATA_ROOT_DIR}/videos"
 OUT_FRAME_DIR = f"{DATA_ROOT_DIR}/keyframes"
 VIDEO_METADATA_PATH = f"{DATA_ROOT_DIR}/metadata.json"
 
-PROCESSED_FRAME_DATA_PATH = f"{DATA_ROOT_DIR}/processed_frame_data.json"
+FRAME_DATA_PATH = f"{DATA_ROOT_DIR}/frame_data.json"
 
 CLIP_MODEL = 'ViT-L-16-SigLIP-256'
 CLIP_PRETRAINED = 'webli'

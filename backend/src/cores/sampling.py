@@ -2,10 +2,15 @@ import os
 import logging
 import json
 from shutil import rmtree
+from typing import Callable
 
 import ffmpeg
 import numpy as np
+import torch
 from tqdm import tqdm
+from PIL import Image
+from torchvision.models import resnet152, ResNet152_Weights
+from open_clip import create_model_and_transforms as clip
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0' # to disable the warning message
 from transnetv2 import TransNetV2
@@ -14,16 +19,209 @@ from utils import get_decoder, get_avg_fps
 
 logger = logging.getLogger(__name__)
 
+
 class FrameSampler:
     def __init__(self,
-                 video_root_dir: str,
+                 metadata: dict[str, dict],
                  output_root_dir: str,
-                 video_metadata_save_path: str,
-                 batch_size=8,
-                 use_gpu=True):
-        self.video_root_dir = video_root_dir
+                 fps: float = 2,
+                 device='cuda' if torch.cuda.is_available() else 'cpu',
+                 ):
+        self.metadata = metadata
         self.output_root_dir = output_root_dir
-        self.video_metadata_save_path = video_metadata_save_path
+        self.fps = fps
+        self.device = torch.device(device)
+        self.model: dict[str, torch.nn.Sequential | torch.Module] = {}
+        self.transforms: dict[str, Callable[[Image.Image], torch.Tensor]] = {}
+        self.frame_paths = []
+
+        # Initialize ResNet model and transforms
+        weights = ResNet152_Weights.DEFAULT
+        resnet = resnet152(weights=weights)
+        model = torch.nn.Sequential(*list(resnet.children())[:-1]) # Remove final FC
+        model.eval().to(self.device)
+        transforms = weights.transforms()
+
+        self.model['resnet'] = model
+        self.transforms['resnet'] = transforms
+        self.resize_size = transforms.resize_size[0]
+
+        # Initialize CLIP model and transforms
+        model, _, transforms = clip('ViT-B-32-256', 'datacomp_s34b_b86k', device=self.device)
+        model.eval()
+
+        self.model['clip'] = model
+        self.transforms['clip'] = transforms
+        self.resize_size = max(self.resize_size, transforms.transforms[0].size)
+
+    def extract_frames(self, video_path: str, batch_size=64):
+        """Extract video frames at given fps."""
+        decoder = get_decoder(video_path, self.device.type == 'cuda')
+        configs = {'vcodec': decoder}
+        if self.device.type == 'cuda' and decoder.endswith('cuvid'):
+            configs['hwaccel'] = 'cuda'
+
+        stream = (
+            ffmpeg
+            .input(video_path, **configs)
+            .filter('fps', self.fps)
+            .filter('scale', self.resize_size, self.resize_size)
+            .output('pipe:', format='rawvideo', pix_fmt='rgb24')
+        )
+
+        proc = ffmpeg.run_async(stream, pipe_stdout=True, quiet=False)
+
+        while True:
+            chunk_size = self.resize_size * self.resize_size * 3 * batch_size
+            chunk = proc.stdout.read(chunk_size)
+            if not chunk:
+                break
+            frames = np.frombuffer(chunk, dtype=np.uint8).copy()
+            frames = frames.reshape(
+                (-1, self.resize_size, self.resize_size, 3))
+            frames = [Image.fromarray(frame) for frame in frames]
+            yield frames
+
+        proc.wait()
+
+    @torch.no_grad()
+    def generate_embeddings(self, frames: list[Image.Image]):
+        """Generate embeddings from given frames."""
+        frames_resnet = [self.transforms['resnet']
+                         (frame) for frame in frames]
+        frames_resnet = torch.stack(frames_resnet).to(self.device)
+        frames_clip = [self.transforms['clip']
+                       (frame) for frame in frames]
+        frames_clip = torch.stack(frames_clip).to(self.device)
+
+        embeddings = torch.concatenate([
+            self.model['resnet'](frames_resnet).squeeze(-1).squeeze(-1),
+            self.model['clip'].encode_image(frames_clip),
+        ], dim=1)
+
+        return embeddings.cpu().numpy()
+
+    def sample_frames(self, video_id: str, threshold=0.9, batch_size=64):
+        """Sample frames bases on cosine similarity of embeddings."""
+        sampled_indices = []
+        prev_emb = None
+        shots = self.metadata[video_id]['shots']
+        shot_idx = 0
+        fps = self.metadata[video_id]['fps']
+        video_path = self.metadata[video_id]['path']
+        for i, frames_batch in enumerate(self.extract_frames(video_path, batch_size)):
+            embeddings = self.generate_embeddings(frames_batch)
+
+            for j, emb in enumerate(embeddings):
+                global_idx = int((i * batch_size + j) * fps / self.fps)
+                if shot_idx < len(shots) and global_idx >= shots[shot_idx]:
+                    # Reset for new shot
+                    shot_idx += 1
+                    prev_emb = None
+                    sampled_indices.append(global_idx)
+
+                if prev_emb is not None:
+                    # Compute cosine similarity
+                    sim = np.dot(prev_emb, emb) / np.linalg.norm(prev_emb) / np.linalg.norm(emb)
+                    if sim <= threshold:
+                        sampled_indices.append(global_idx)
+
+                prev_emb = emb  # Update for next comparison
+
+        logger.info(f"Sampled {len(sampled_indices)} frames")
+        return sampled_indices
+
+    def save_frames(self, video_id: str, indices: list[int]):
+        """Save frames at given indices."""
+        if not indices:
+            logger.info("No indices provided, no frames saved.")
+            return
+
+        shot_root_dir = os.path.join(self.output_root_dir, video_id)
+        if os.path.exists(shot_root_dir):
+            rmtree(shot_root_dir, ignore_errors=True)
+        os.makedirs(shot_root_dir)
+
+        # Create output temp directory
+        temp_dir = os.path.join(shot_root_dir, "temp")
+        os.makedirs(temp_dir)
+
+        try:
+            # Build select filter for all frames at once
+            select_conditions = '+'.join([f"eq(n,{idx})" for idx in indices])
+
+            # Extract all frames in one operation
+            video_path = self.metadata[video_id]['path']
+            decoder = get_decoder(video_path, self.device.type == 'cuda')
+            configs = {'vcodec': decoder}
+            if self.device.type == 'cuda' and decoder.endswith('cuvid'):
+                configs['hwaccel'] = 'cuda'
+            (
+                ffmpeg
+                .input(video_path, **configs)
+                .filter('select', select_conditions)
+                .output(os.path.join(temp_dir, 'frame_%06d.jpg'), vsync=0)
+                .run(quiet=True)
+            )
+
+            # Organize extracted frames into shot directories
+            total_frames = 0
+            shots = self.metadata[video_id]['shots']
+            shot_idx = 0
+            frame_dir = ''
+            frame_files = sorted(os.listdir(temp_dir))
+            for i, frame_file in enumerate(frame_files):
+                if shot_idx < len(shots) and indices[i] >= shots[shot_idx]:
+                    # Create shot directory
+                    frame_dir = os.path.join(shot_root_dir, f"S{shot_idx:05}")
+                    os.makedirs(frame_dir)
+                    shot_idx += 1
+
+                # Rename and move file
+                src_path = os.path.join(temp_dir, frame_file)
+                ext = os.path.splitext(frame_file)[1]
+                dst_path = os.path.join(frame_dir, f"F{indices[i]:06}{ext}")
+                os.rename(src_path, dst_path)
+                self.frame_paths.append(dst_path)
+                total_frames += 1
+
+            return total_frames
+
+        except ffmpeg.Error as e:
+            err = e.stderr.decode() if hasattr(e, 'stderr') else e
+            logger.error(f"ffmpeg decoding failed for {video_path}: {err}")
+            return 0
+
+        except Exception as e:
+            logger.error(f"Error extracting frames from {video_path}: {e}")
+            return 0
+
+        finally:
+            # Clean up temp directory
+            rmtree(temp_dir, ignore_errors=True)
+
+    def run(self):
+        """Extract keyframes from given videos."""
+        os.makedirs(self.output_root_dir, exist_ok=True)
+
+        desc = 'Sampling keyframes'
+        total_frames = 0
+        for video_id in tqdm(self.metadata, desc=desc):
+            sampled_indices = self.sample_frames(video_id)
+            total_frames += self.save_frames(video_id, sampled_indices)
+
+        logger.info(f"Successfully extracted {total_frames} frames from {len(self.metadata)} videos")
+        return self.frame_paths
+
+
+class ShotDetector:
+    def __init__(self,
+                 video_root_dir: str,
+                 metadata_save_path: str,
+                 batch_size=8,
+                 use_gpu=torch.cuda.is_available()):
+        self.video_root_dir = video_root_dir
+        self.metadata_save_path = metadata_save_path
         self.batch_size = batch_size
         self.use_gpu = use_gpu
 
@@ -37,111 +235,6 @@ class FrameSampler:
         for path in self.video_paths:
             video_id = os.path.splitext(os.path.basename(path))[0]
             self.metadata[video_id] = dict(path=path)
-
-    def extract_frames(self, video_path: str, shots: np.ndarray):
-        """Extract keyframes from detected shots."""
-        video_id = os.path.splitext(os.path.basename(video_path))[0]
-        shot_root_dir = os.path.join(self.output_root_dir, video_id)
-        os.makedirs(shot_root_dir, exist_ok=True)
-
-        # Calculate all frame positions to extract
-        all_positions = []
-        position_info = {}  # Maps position to (shot_idx, position_type)
-
-        for shot_idx, (start, end) in enumerate(shots):
-            positions = [
-                start,
-                int(start + (end - start) * 1/3),
-                int(start + (end - start) * 2/3),
-                end
-            ]
-
-            # Remove duplicates within a shot
-            unique_positions = sorted(set(positions))
-
-            for pos_idx, pos in enumerate(unique_positions):
-                all_positions.append(pos)
-
-                # Track which shot this frame belongs to and its type
-                position_type = None
-
-                # Handle short shots with fewer than 3 unique positions
-                if len(unique_positions) == 2:
-                    # Mark the first frame as "selected_1" and the second as "selected_2"
-                    if pos_idx == 0:
-                        position_type = "selected_1"
-                    elif pos_idx == 1:
-                        position_type = "selected_2"
-                elif len(unique_positions) > 2:
-                    # For longer shots, mark 1/3 and 2/3 positions as selected
-                    if pos == positions[1]:
-                        position_type = "selected_1"
-                    elif pos == positions[2]:
-                        position_type = "selected_2"
-
-                position_info[pos] = (shot_idx, position_type)
-
-        # Sort positions for easier processing
-        all_positions = sorted(set(all_positions))
-
-        # Create output temp directory
-        temp_dir = os.path.join(self.output_root_dir, "temp")
-        os.makedirs(temp_dir, exist_ok=True)
-
-        try:
-            # Build select filter for all frames at once
-            select_conditions = '+'.join([f"eq(n,{pos})" for pos in all_positions])
-
-            # Extract all frames in one operation
-            decoder = get_decoder(video_path, self.use_gpu)
-            configs = {'vcodec': decoder}
-            if self.use_gpu and decoder.endswith('cuvid'):
-                configs['hwaccel'] = 'cuda'
-            (
-                ffmpeg
-                .input(video_path, **configs)
-                .filter('select', select_conditions)
-                .output(os.path.join(temp_dir, 'frame_%06d.jpg'), vsync=0)
-                .run(quiet=True)
-            )
-
-            # Organize extracted frames into shot directories
-            total_frames = 0
-            frame_files = sorted(os.listdir(temp_dir))
-
-            for i, frame_file in enumerate(frame_files):
-                if i >= len(all_positions):
-                    break
-
-                pos = all_positions[i]
-                shot_idx, position_type = position_info[pos]
-
-                # Create shot directory
-                shot_id = f"S{shot_idx:05}"
-                frame_dir = os.path.join(shot_root_dir, shot_id)
-                os.makedirs(frame_dir, exist_ok=True)
-
-                # Rename and move file
-                frame_id = f"F{pos:06}"
-                src_path = os.path.join(temp_dir, frame_file)
-
-                if position_type:
-                    dst_path = os.path.join(frame_dir, f"{frame_id}_selected.jpg")
-                else:
-                    dst_path = os.path.join(frame_dir, f"{frame_id}.jpg")
-
-                os.rename(src_path, dst_path)
-                total_frames += 1
-
-            return total_frames
-
-        except Exception as e:
-            print(f"Error extracting frames from {video_path}: {e}")
-            return 0
-
-        finally:
-            # Clean up temp directory
-            rmtree(temp_dir, ignore_errors=True)
 
     # Modified version of https://github.com/soCzech/TransNetV2/blob/master/inference/transnetv2.py
     def predict_frames(self, frames: np.ndarray):
@@ -215,18 +308,13 @@ class FrameSampler:
         return self.predict_frames(frames)
 
     def save_metadata(self):
-        with open(self.video_metadata_save_path, 'w') as f:
+        with open(self.metadata_save_path, 'w') as f:
             json.dump(self.metadata, f, indent=2)
 
     def run(self):
-        """Detect shots from a video and extract keyframes."""
-        if os.path.exists(self.output_root_dir):
-            rmtree(self.output_root_dir)
-        os.makedirs(self.output_root_dir)
-
-        desc = 'Sampling keyframes'
+        """Detect shots from given videos."""
+        desc = 'Detecting shots'
         total_shots = 0
-        total_frames = 0
         for video_path in tqdm(self.video_paths, desc, len(self.video_paths)):
             # Detect shots
             preds, _ = self.predict_video(video_path)
@@ -242,11 +330,6 @@ class FrameSampler:
             self.metadata[video_id]['shots'] = [shot[0] for shot in shots.tolist()]
             self.metadata[video_id]['fps'] = get_avg_fps(video_path)
 
-            # Extract frames from each shot
-            num_frames = self.extract_frames(video_path, shots)
-            if num_frames:
-                total_frames += num_frames
-
         self.save_metadata()
 
-        logger.info(f"Successfully extracted {total_frames} frames from {total_shots} shots")
+        logger.info(f"Successfully detected {total_shots} shots from {len(self.video_paths)} videos")

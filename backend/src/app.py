@@ -20,7 +20,7 @@ from configs import (
     VIDEO_DIR,
     OUT_FRAME_DIR,
     VIDEO_METADATA_PATH,
-    PROCESSED_FRAME_DATA_PATH,
+    FRAME_DATA_PATH,
     DATA_ROOT_DIR,
     STATIC_IMAGE_PATH,
     STATIC_VIDEO_PATH,
@@ -120,7 +120,7 @@ class App(FastAPI):
         clip_index_path = [os.path.join(DATA_ROOT_DIR, f"index_{m}_{p}.bin")
                            for m, p in CLIP_MODELS]
         model, pretrained = zip(*CLIP_MODELS)
-        with open(PROCESSED_FRAME_DATA_PATH) as f:
+        with open(FRAME_DATA_PATH) as f:
             metadata = json.load(f)
         self.retriever = Retriever(clip_index_path,
                                    DINO_INDEX_SAVE_PATH,
