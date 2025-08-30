@@ -160,6 +160,11 @@ export default function VideoPreview({ data, onClose }) {
                   type="number"
                   value={currentFrame}
                   onChange={(e) => setCurrentFrame(Number(e.target.value))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      goToFrame();
+                    }
+                  }}
                   style={{
                     width: 100,
                     height: 30,
