@@ -63,13 +63,18 @@ export default function InfoModal({ open, onClose, item }) {
         <div style={{ fontSize: 14, lineHeight: 1.6 }}>
           <div><strong>Score:</strong> {typeof score === 'number' ? score.toFixed(4) : score}</div>
           {video_id !== undefined && (
-            <div onClick={() => handleCopy(video_id)} style={{ cursor: 'pointer' }}>
+            <div
+              title='Click to copy'
+              onClick={() => handleCopy(video_id)}
+              style={{ cursor: 'pointer' }}
+            >
               <strong>Video ID:</strong> {video_id}
             </div>
           )}
           {shot_id !== undefined && <div><strong>Shot ID:</strong> {shot_id}</div>}
           {frameNumber && (
             <div
+              title='Click to copy'
               onClick={() => handleCopy(frameNumber)}
               style={{ cursor: 'pointer' }}
             >
