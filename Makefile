@@ -5,8 +5,7 @@ setup:
 	pip install matplotlib tensorflow ffmpeg-python pillow \
 		ftfy regex tqdm "fastapi[standard]" open_clip_torch \
 		google-genai python-dotenv accelerate elasticsearch \
-		faster-whisper ctranslate2==4.6.0 \
-		git+https://github.com/huggingface/transformers.git
+		faster-whisper ctranslate2==4.6.0 transformers
 	micromamba install ffmpeg
 	micromamba install -c pytorch faiss-cpu
 # 	only for cuda supported machine
