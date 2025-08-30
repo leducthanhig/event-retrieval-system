@@ -1,4 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 
 export default function VideoPreview({ data, onClose }) {
   if (!data) return null;
@@ -7,6 +9,8 @@ export default function VideoPreview({ data, onClose }) {
   const videoRef = useRef(null);
   const frameTime = 1 / data.fps;
   const [currentFrame, setCurrentFrame] = useState(0); // Track the current frame index
+
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
   const getVideoId = (it) => {
     if (!it) return 'unknown';
@@ -68,22 +72,53 @@ export default function VideoPreview({ data, onClose }) {
     };
   }, [frameTime]);
 
+  useEffect(() => {
+    // Keep the frame display in sync while the video is playing/scrubbing
+    const updateCurrentFrame = () => {
+      if (videoRef.current) {
+        setCurrentFrame(Math.floor(videoRef.current.currentTime / frameTime));
+      }
+    };
+
+    if (videoRef.current) {
+      videoRef.current.addEventListener('timeupdate', updateCurrentFrame);
+    }
+
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.removeEventListener('timeupdate', updateCurrentFrame);
+      }
+    };
+  }, [frameTime]);
+
   const handleKeyDown = (e) => {
     if (!videoRef.current || !videoRef.current.paused) return;
 
     if (e.key === 'ArrowLeft') {
-      e.preventDefault(); // Prevent default behavior
-      // Seek one frame back
-      const newTime = Math.max(0, videoRef.current.currentTime - frameTime);
-      videoRef.current.currentTime = newTime;
-      setCurrentFrame(Math.floor(newTime / frameTime));
+      e.preventDefault();
+      stepFrames(-1);
     } else if (e.key === 'ArrowRight') {
-      e.preventDefault(); // Prevent default behavior
-      // Seek one frame forward
-      const newTime = Math.min(videoRef.current.duration, videoRef.current.currentTime + frameTime);
-      videoRef.current.currentTime = newTime;
-      setCurrentFrame(Math.floor(newTime / frameTime));
+      e.preventDefault();
+      stepFrames(1);
     }
+  };
+
+  // Step the video by a given number of frames (negative for backward, positive for forward)
+  const stepFrames = (delta) => {
+    const vid = videoRef.current;
+    if (!vid || !Number.isFinite(vid.duration)) return;
+
+    // Pause to ensure frame-accurate stepping
+    if (!vid.paused) vid.pause();
+
+    // Compute next frame index from current time -> index -> +delta
+    const idxNow = Math.floor(vid.currentTime / frameTime);
+    const idxNext = clamp(idxNow + delta, 0, Math.floor(vid.duration / frameTime));
+
+    const newTime = idxNext * frameTime;
+    vid.currentTime = clamp(newTime, 0, vid.duration);
+    setCurrentFrame(idxNext);
+    vid.focus();
   };
 
   const goToFrame = () => {
@@ -118,14 +153,16 @@ export default function VideoPreview({ data, onClose }) {
               onKeyDownCapture={handleKeyDown} // Add the keydown event listener here
               tabIndex="0" // Ensure the video element is focusable
             />
-            <div style={{ marginTop: 8, color: '#fff' }}>
-              <div style={{ display: 'flex', alignItems: 'center', marginTop: 8 }}>
+            <div style={{ marginTop: 0, color: '#fff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginTop: 4 }}>
                 <label style={{ marginRight: 8 }}>Frame:</label>
                 <input
                   type="number"
                   value={currentFrame}
                   onChange={(e) => setCurrentFrame(Number(e.target.value))}
                   style={{
+                    width: 100,
+                    height: 30,
                     marginRight: 8,
                     padding: '4px',
                     borderRadius: '4px',
@@ -139,10 +176,28 @@ export default function VideoPreview({ data, onClose }) {
                     borderRadius: '4px',
                     background: '#4caf50',
                     color: '#fff',
-                    border: 'none'
+                    border: 'none',
+                    marginRight: 8
                   }}
                 >
                   Go
+                </button>
+
+                <button
+                  onClick={() => stepFrames(-1)}
+                  className="icon-btn"
+                  aria-label="Step backward one frame"
+                  title="Previous frame"
+                >
+                  <FontAwesomeIcon icon={faArrowLeft} />
+                </button>
+                <button
+                  onClick={() => stepFrames(1)}
+                  className="icon-btn"
+                  aria-label="Step forward one frame"
+                  title="Next frame"
+                >
+                  <FontAwesomeIcon icon={faArrowRight} />
                 </button>
               </div>
             </div>

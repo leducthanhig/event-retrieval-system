@@ -173,3 +173,17 @@
   background: rgba(0,0,0,0.8);
   z-index: 5;
 }
+
+.icon-btn {
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #e5e7eb;
+  cursor: pointer;
+  margin-right: 0px;
+}
+
+.icon-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid transparent;
+}
