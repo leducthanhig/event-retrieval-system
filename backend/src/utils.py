@@ -1,7 +1,4 @@
 import ffmpeg
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from PIL import Image
 
 
 def get_decoder(video_file: str, use_gpu=True):
