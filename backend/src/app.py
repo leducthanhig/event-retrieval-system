@@ -325,16 +325,13 @@ class App(FastAPI):
 
         final_results = []
         for video_id, score in results:
-            # use the selected keyframe of the middle shot as thumbnail
+            # use the middle keyframe of the middle shot as thumbnail
             selected_shot = len(self.metadata[video_id]['shots']) // 2
             shot_id = f"S{selected_shot:05}"
             frame_dir = os.path.join(OUT_FRAME_DIR, video_id, shot_id)
             frames = os.listdir(frame_dir)
-            selected_frame = [frame for frame in frames
-                              if os.path.splitext(frame)[0].endswith('_selected')]
-
-            if selected_frame:
-                thumbnail = os.path.join(frame_dir, selected_frame[0])
+            if len(frames):
+                thumbnail = os.path.join(frame_dir, frames[len(frames) // 2])
             else:
                 thumbnail = ''
 
@@ -355,14 +352,10 @@ class App(FastAPI):
         for info, score in results:
             video_id = info['video_id']
             shot_id = f"S{info['id']:05}"
-
             frame_dir = os.path.join(OUT_FRAME_DIR, video_id, shot_id)
             frames = os.listdir(frame_dir)
-            selected_frame = [frame for frame in frames
-                              if os.path.splitext(frame)[0].endswith('_selected')]
-
-            if selected_frame:
-                thumbnail = os.path.join(frame_dir, selected_frame[0])
+            if len(frames):
+                thumbnail = os.path.join(frame_dir, frames[len(frames) // 2])
             else:
                 thumbnail = ''
 
