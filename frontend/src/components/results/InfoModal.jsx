@@ -15,7 +15,7 @@ export default function InfoModal({ open, onClose, item }) {
 
   const { score, video_id, shot_id, thumbnail } = item || {};
 
-  const match = thumbnail?.match(/\/F(\d+)(?:_selected)?\.(?:jpg|jpeg|png|gif)$/);
+  const match = thumbnail?.match(/[\/\\]F(\d+)(?:_selected)?\.(?:jpg|jpeg|png|gif)$/);
   const frameNumber = match ? Number(match[1]) : null;
 
   const handleCopy = (text) => {
