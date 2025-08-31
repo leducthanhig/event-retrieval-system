@@ -9,6 +9,7 @@ export default function VideoPreview({ data, onClose }) {
   const videoRef = useRef(null);
   const frameTime = 1 / data.fps;
   const [currentFrame, setCurrentFrame] = useState(0); // Track the current frame index
+  const accumulatedDelta = useRef(0); // Accumulate deltas when precision prevents stepping
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -111,14 +112,25 @@ export default function VideoPreview({ data, onClose }) {
     // Pause to ensure frame-accurate stepping
     if (!vid.paused) vid.pause();
 
-    // Compute next frame index from current time -> index -> +delta
+    // Add accumulated delta to the current delta
+    const totalDelta = delta + accumulatedDelta.current;
     const idxNow = Math.floor(vid.currentTime / frameTime);
-    const idxNext = clamp(idxNow + delta, 0, Math.floor(vid.duration / frameTime));
+    const idxNext = clamp(idxNow + totalDelta, 0, Math.floor(vid.duration / frameTime));
 
     const newTime = idxNext * frameTime;
-    vid.currentTime = clamp(newTime, 0, vid.duration);
-    setCurrentFrame(idxNext);
-    vid.focus();
+
+    // Tolerance for floating-point comparison
+    const tolerance = 0.0001;
+    if (Math.abs(vid.currentTime - newTime) > tolerance) {
+      // Apply the change and reset accumulator
+      vid.currentTime = clamp(newTime, 0, vid.duration);
+      setCurrentFrame(idxNext);
+      accumulatedDelta.current = 0; // Reset since we applied the step
+      vid.focus();
+    } else {
+      // Accumulate the delta for the next step (clamp to prevent runaway)
+      accumulatedDelta.current = clamp(accumulatedDelta.current + delta, -10, 10);
+    }
   };
 
   const goToFrame = () => {
