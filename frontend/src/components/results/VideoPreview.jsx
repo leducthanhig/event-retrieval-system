@@ -7,11 +7,21 @@ export default function VideoPreview({ data, onClose }) {
 
   const videoUrl = `/videos?url=${data.video_path}`;
   const videoRef = useRef(null);
-  const frameTime = 1 / data.fps;
-  const [currentFrame, setCurrentFrame] = useState(0); // Track the current frame index
-  const accumulatedDelta = useRef(0); // Accumulate deltas when precision prevents stepping
 
+  // Frame math helpers
+  const frameTime = 1 / data.fps;
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+  const [currentFrame, setCurrentFrame] = useState('0');
+
+  // Accuracy / retry constants for seeking
+  const EPS_BASE = Math.max(1e-3, frameTime / 1000); // ~1ms (or smaller than frameTime)
+  const MAX_RETRIES = 3;
+
+  // Seeking state
+  const seekingRef = useRef(false);
+  const queuedDeltaRef = useRef(0);
+  const targetFrameRef = useRef(0);
 
   const getVideoId = (it) => {
     if (!it) return 'unknown';
@@ -29,117 +39,183 @@ export default function VideoPreview({ data, onClose }) {
 
   const videoId = getVideoId(data);
 
+  // Close on Escape (window-level)
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [onClose]);
 
+  // Arrow keys (window-level)
   useEffect(() => {
-    if (!videoRef.current || data.start === undefined) return;
-
-    const handler = () => {
-      if (videoRef.current) {
-        videoRef.current.currentTime = data.start;
-        setCurrentFrame(Math.floor(data.start / frameTime));
+    const onKey = (e) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        stepFrames(-1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        stepFrames(1);
       }
     };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
-    videoRef.current.addEventListener('loadedmetadata', handler);
-
-    return () => {
-      if (videoRef.current) {
-        videoRef.current.removeEventListener('loadedmetadata', handler);
-      }
-    };
-  }, [data, frameTime]);
-
+  // Seek to data.start as soon as metadata is ready (with small epsilon)
   useEffect(() => {
-    const updateCurrentFrame = () => {
-      if (videoRef.current) {
-        setCurrentFrame(Math.floor(videoRef.current.currentTime / frameTime));
-      }
+    const vid = videoRef.current;
+    if (!vid || data.start === undefined) return;
+
+    const EPS = Math.max(1e-3, frameTime / 1000);
+    const setStart = () => {
+      const safeDur = Number.isFinite(vid.duration) ? vid.duration : data.start + EPS;
+      const t = clamp(data.start + EPS, 0, safeDur);
+      vid.currentTime = t;
+      setCurrentFrame(Math.floor(t / frameTime));
+      // make sure the video can receive focus if user wants to use space/play, etc.
+      vid.focus?.();
     };
 
-    if (videoRef.current) {
-      videoRef.current.addEventListener('timeupdate', updateCurrentFrame);
+    if (vid.readyState >= 1) {
+      setStart();
+      return;
     }
 
+    const onMeta = () => setStart();
+    vid.addEventListener('loadedmetadata', onMeta, { once: true });
+    return () => vid.removeEventListener('loadedmetadata', onMeta);
+  }, [data.start, frameTime]);
+
+  // Keep currentFrame in sync with the video time (prefer rVFC, fallback to timeupdate)
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+
+    let handle = null;
+    let running = true;
+
+    const updateFromTime = () => {
+      if (!running || !videoRef.current) return;
+      setCurrentFrame(Math.floor(videoRef.current.currentTime / frameTime));
+    };
+
+    if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+      const tick = () => {
+        if (!running) return;
+        updateFromTime();
+        // @ts-ignore – rVFC is supported on modern browsers
+        handle = vid.requestVideoFrameCallback(tick);
+      };
+      // @ts-ignore
+      handle = vid.requestVideoFrameCallback(tick);
+      return () => {
+        running = false;
+        if (vid && handle != null && 'cancelVideoFrameCallback' in HTMLVideoElement.prototype) {
+          // @ts-ignore
+          vid.cancelVideoFrameCallback(handle);
+        }
+      };
+    }
+
+    // Fallback for older browsers
+    const onTime = updateFromTime;
+    vid.addEventListener('timeupdate', onTime);
     return () => {
-      if (videoRef.current) {
-        videoRef.current.removeEventListener('timeupdate', updateCurrentFrame);
-      }
+      vid.removeEventListener('timeupdate', onTime);
     };
   }, [frameTime]);
 
-  useEffect(() => {
-    // Keep the frame display in sync while the video is playing/scrubbing
-    const updateCurrentFrame = () => {
-      if (videoRef.current) {
-        setCurrentFrame(Math.floor(videoRef.current.currentTime / frameTime));
-      }
-    };
-
-    if (videoRef.current) {
-      videoRef.current.addEventListener('timeupdate', updateCurrentFrame);
-    }
-
-    return () => {
-      if (videoRef.current) {
-        videoRef.current.removeEventListener('timeupdate', updateCurrentFrame);
-      }
-    };
-  }, [frameTime]);
-
-  const handleKeyDown = (e) => {
-    if (!videoRef.current || !videoRef.current.paused) return;
-
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      stepFrames(-1);
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      stepFrames(1);
-    }
+  // time <-> frame helpers with clamping
+  const timeToFrame = (t) => Math.floor(t / frameTime);
+  const clampFrame = (idx) => {
+    const vid = videoRef.current;
+    if (!vid || !Number.isFinite(vid.duration)) return Math.max(0, idx);
+    const maxIdx = Math.floor(vid.duration / frameTime);
+    return Math.min(Math.max(0, idx), maxIdx);
   };
 
-  // Step the video by a given number of frames (negative for backward, positive for forward)
+  // Accurate seek with epsilon and small retries, also queues extra deltas while seeking
+  const seekToFrameAccurate = (frameIdx, attempt = 0) => {
+    const vid = videoRef.current;
+    if (!vid || !Number.isFinite(vid.duration)) return;
+
+    if (!vid.paused) vid.pause(); // ensure frame-accurate stepping
+
+    seekingRef.current = true;
+    targetFrameRef.current = frameIdx;
+
+    const eps = EPS_BASE * (attempt + 1); // 0.001, 0.002, 0.003, ...
+    const targetTime = clamp(frameIdx * frameTime + eps, 0, vid.duration);
+
+    const onSeeked = () => {
+      const gotIdx = timeToFrame(vid.currentTime);
+
+      if (gotIdx === frameIdx && Math.abs(vid.currentTime - targetTime) < 0.02) {
+        // Success
+        setCurrentFrame(gotIdx);
+        seekingRef.current = false;
+
+        const q = queuedDeltaRef.current;
+        queuedDeltaRef.current = 0;
+        if (q !== 0) {
+          const next = clampFrame(targetFrameRef.current + q);
+          seekToFrameAccurate(next, 0);
+        }
+      } else if (attempt + 1 < MAX_RETRIES) {
+        // Retry with a slightly larger epsilon
+        seekToFrameAccurate(frameIdx, attempt + 1);
+      } else {
+        // Give up after MAX_RETRIES; still update UI to nearest frame
+        setCurrentFrame(gotIdx);
+        seekingRef.current = false;
+
+        const q = queuedDeltaRef.current;
+        queuedDeltaRef.current = 0;
+        if (q !== 0) {
+          const next = clampFrame(targetFrameRef.current + q);
+          seekToFrameAccurate(next, 0);
+        }
+      }
+
+      vid.removeEventListener('seeked', onSeeked);
+    };
+
+    vid.addEventListener('seeked', onSeeked, { once: true });
+    vid.currentTime = targetTime;
+  };
+
+  // Public: step by delta frames (used by both keyboard and icon buttons)
   const stepFrames = (delta) => {
     const vid = videoRef.current;
     if (!vid || !Number.isFinite(vid.duration)) return;
 
-    // Pause to ensure frame-accurate stepping
-    if (!vid.paused) vid.pause();
+    const idxNow = timeToFrame(vid.currentTime);
+    const target = clampFrame(idxNow + delta);
 
-    // Add accumulated delta to the current delta
-    const totalDelta = delta + accumulatedDelta.current;
-    const idxNow = Math.floor(vid.currentTime / frameTime);
-    const idxNext = clamp(idxNow + totalDelta, 0, Math.floor(vid.duration / frameTime));
-
-    const newTime = idxNext * frameTime;
-
-    // Tolerance for floating-point comparison
-    const tolerance = 0.0001;
-    if (Math.abs(vid.currentTime - newTime) > tolerance) {
-      // Apply the change and reset accumulator
-      vid.currentTime = clamp(newTime, 0, vid.duration);
-      setCurrentFrame(idxNext);
-      accumulatedDelta.current = 0; // Reset since we applied the step
-      vid.focus();
-    } else {
-      // Accumulate the delta for the next step (clamp to prevent runaway)
-      accumulatedDelta.current = clamp(accumulatedDelta.current + delta, -10, 10);
+    if (seekingRef.current) {
+      // Queue delta while we are still seeking
+      queuedDeltaRef.current = Math.max(-9999, Math.min(9999, queuedDeltaRef.current + delta));
+      return;
     }
+
+    seekToFrameAccurate(target, 0);
   };
 
+  // Jump to frame (Go button or Enter in input)
   const goToFrame = () => {
-    if (videoRef.current) {
-      const newTime = currentFrame * frameTime;
-      videoRef.current.currentTime = Math.min(videoRef.current.duration, Math.max(0, newTime));
-      setCurrentFrame(currentFrame);
-      videoRef.current.focus(); // Refocus the video element
+    const vid = videoRef.current;
+    if (!vid || !Number.isFinite(vid.duration)) return;
+
+    const target = clampFrame(currentFrame);
+    if (seekingRef.current) {
+      // If user requests a jump while seeking, override the target
+      targetFrameRef.current = target;
+      queuedDeltaRef.current = 0;
+      return;
     }
+    seekToFrameAccurate(target, 0);
   };
 
   return (
@@ -161,8 +237,8 @@ export default function VideoPreview({ data, onClose }) {
               src={videoUrl}
               controls
               autoPlay
+              preload="auto"
               style={{ width: '100%', borderRadius: 6 }}
-              onKeyDownCapture={handleKeyDown} // Add the keydown event listener here
               tabIndex="0" // Ensure the video element is focusable
             />
             <div style={{ marginTop: 0, color: '#fff' }}>
@@ -171,10 +247,14 @@ export default function VideoPreview({ data, onClose }) {
                 <input
                   type="number"
                   value={currentFrame}
-                  onChange={(e) => setCurrentFrame(Number(e.target.value))}
+                  onChange={(e) => setCurrentFrame(e.target.value)} // keep raw string
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      goToFrame();
+                      const num = Number(currentFrame);
+                      if (!Number.isNaN(num)) {
+                        setCurrentFrame(String(num)); // normalize on commit
+                        goToFrame();
+                      }
                     }
                   }}
                   style={{
