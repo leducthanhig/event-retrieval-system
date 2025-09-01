@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import '../../styles/results.css';
 import ResultsGrid from '../results/ResultsGrid';
 import VideoPreviewModal from '../results/VideoPreview';
@@ -7,6 +7,7 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
   
   const [groupByVideo, setGroupByVideo] = useState(false);
   const [groupSortKey, setGroupSortKey] = useState('score');
+  const [collapsedById, setCollapsedById] = useState(() => new Set());
 
   const getVideoId = (it) => it.video_id ?? it.videoId ?? it.video?.id ?? 'unknown';
   const getVideoTitle = (it) => it.video_title ?? it.videoTitle ?? it.video?.name ?? getVideoId(it);
@@ -19,6 +20,16 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
     const m = s.replace(/^s/i, '').match(/\d+/);
     return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
   };
+
+  // Toggle a single video's collapsed state
+  const toggleCollapse = useCallback((videoId) => {
+    setCollapsedById((prev) => {
+      const next = new Set(prev);
+      if (next.has(videoId)) next.delete(videoId);
+      else next.add(videoId);
+      return next;
+    });
+  }, []);
 
   // Group & sort per video when enabled
   const grouped = useMemo(() => {
@@ -98,17 +109,42 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
         {groupByVideo && (
           grouped && grouped.length > 0 ? (
             <div className="grouped-results">
-              {grouped.map((g) => (
-                <section key={g.videoId} className="video-group">
-                  <div className="video-group__title">{g.title}</div>
-                  <ResultsGrid
-                    results={g.items}
-                    onSelect={onSelect}
-                    onSimilarSearch={onSimilarSearch}
-                    disableInternalSort
-                  />
-                </section>
-              ))}
+              {grouped.map((g) => {
+                // Whether this group's items are collapsed
+                const isCollapsed = collapsedById.has(g.videoId);
+
+                return (
+                  <section key={g.videoId} className="video-group">
+                    <button
+                      type="button"
+                      className="video-group__title-button"
+                      aria-expanded={!isCollapsed}
+                      onClick={() => toggleCollapse(g.videoId)}
+                    >
+                      <span
+                        className="twisty"
+                        aria-hidden="true"
+                        data-collapsed={isCollapsed ? 'true' : 'false'}
+                      >
+                        {isCollapsed ? '▸' : '▾'}
+                      </span>
+                      <span className="video-group__title-text">
+                        {g.title} <span className="video-group__count">({g.items.length})</span>
+                      </span>
+                    </button>
+
+                    {/* Only render items when expanded for performance */}
+                    {!isCollapsed && (
+                      <ResultsGrid
+                        results={g.items}
+                        onSelect={onSelect}
+                        onSimilarSearch={onSimilarSearch}
+                        disableInternalSort
+                      />
+                    )}
+                  </section>
+                );
+              })}
             </div>
           ) : (
             <ResultsGrid

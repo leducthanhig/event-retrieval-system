@@ -187,3 +187,62 @@
   background-color: rgba(255, 255, 255, 0.1);
   border: 1px solid transparent;
 }
+
+/* Title row: plain text aligned left */
+.video-group__title-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  /* remove background & border */
+  width: 100%;
+  padding: 4px 0; /* minimal vertical spacing */
+  background: none;
+  border: none;
+
+  /* text style */
+  color: #f3f4f6; /* near white */
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Remove hover background */
+.video-group__title-button:hover {
+  background: none;
+  border: none;
+}
+
+/* Arrow icon bigger and aligned left */
+.twisty {
+  font-size: 1.5rem;
+  line-height: 1;
+  width: 1.3ch;
+  display: inline-block;
+  transform: translateY(1px);
+  transition: color 120ms ease;
+  color: #9ca3af;
+}
+
+/* Arrow color when collapsed */
+.twisty[data-collapsed="true"] {
+  color: #a78bfa;
+}
+
+/* Title text aligned flush with results */
+.video-group__title-text {
+  margin-left: 0;
+}
+
+/* Indent grid so thumbnails line up with text */
+.video-group .results-grid {
+  margin-left: 1.6rem;
+}
+
+.video-group__count {
+  font-size: 1rem;
+  font-weight: 400;
+  color: #d1d5db;
+  margin-left: 4px;
+}
