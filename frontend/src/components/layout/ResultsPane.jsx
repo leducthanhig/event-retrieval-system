@@ -3,6 +3,9 @@ import '../../styles/results.css';
 import ResultsGrid from '../results/ResultsGrid';
 import VideoPreviewModal from '../results/VideoPreview';
 
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPlus } from '@fortawesome/free-solid-svg-icons';
+
 export default function ResultsPane({ results, onSelect, selectedItem, onClosePreview, onSimilarSearch, isSearching, error }) {
   
   const [groupByVideo, setGroupByVideo] = useState(false);
@@ -56,33 +59,104 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
     }));
   }, [groupByVideo, groupSortKey, results]);
 
+  // Open video by name/ID
+  const [openName, setOpenName] = useState('');    // controlled input on topbar
+  const [openData, setOpenData] = useState(null);  // data object for VideoPreview when opening by name
+  const [openError, setOpenError] = useState('');
+  const [isResolving, setIsResolving] = useState(false);
+
+  const firstShotId = 'S00000';
+  const normalizeVideoId = (raw) =>
+    (raw || '').trim().replace(/\.(mp4|mkv|mov|avi|webm|m4v)$/i, '');
+
+  const openByName = useCallback(async () => {
+    setOpenError('');
+    const raw = (openName || '').trim();
+    if (!raw) return;
+
+    const videoId = normalizeVideoId(raw);
+    if (!videoId) return;
+
+    try {
+      setIsResolving(true);
+      const shotsRes = await fetch(`/shots/${encodeURIComponent(videoId)}/${firstShotId}`);
+      if (shotsRes.ok) {
+        const shot = await shotsRes.json();
+        setOpenData({
+          video_path: shot.video_path,
+          fps: Number(shot.fps) || 30,
+          start: 0,
+          video_id: videoId,
+        });
+        return;
+      }
+    } catch (err) {
+      setOpenError(err.message || 'Unable to open the requested video.');
+    } finally {
+      setIsResolving(false);
+    }
+  }, [openName]);
+
+  const previewData = openData ?? selectedItem;
+  const closePreview = useCallback(() => {
+    if (openData) setOpenData(null);
+    else onClosePreview?.();
+  }, [openData, onClosePreview]);
+
   return (
     <main className="ner-results" aria-busy={isSearching ? 'true' : 'false'}>
       {/* Top bar */}  
       <div className="results-topbar">
-        <label className="topbar-item">
-          <input
-            type="checkbox"
-            checked={groupByVideo}
-            onChange={(e) => setGroupByVideo(e.target.checked)}
-          />
-          <span>Group by video</span>
-        </label>
-
-        {groupByVideo && (
+        <div className="topbar-left">
           <label className="topbar-item">
-            <span>Sort by:</span>
-            <select
-              value={groupSortKey}
-              onChange={(e) => setGroupSortKey(e.target.value)}
-            >
-              <option value="score">Score (desc)</option>
-              <option value="shot">ShotID (asc)</option>
-            </select>
+            <input
+              type="checkbox"
+              checked={groupByVideo}
+              onChange={(e) => setGroupByVideo(e.target.checked)}
+            />
+            <span>Group by video</span>
           </label>
-        )}
-      </div>
 
+          {groupByVideo && (
+            <label className="topbar-item">
+              <span>Sort by:</span>
+              <select
+                value={groupSortKey}
+                onChange={(e) => setGroupSortKey(e.target.value)}
+              >
+                <option value="score">Score (desc)</option>
+                <option value="shot">ShotID (asc)</option>
+              </select>
+            </label>
+          )}
+        </div>
+
+        <div className="topbar-right">
+          <span className="open-by-name-label">Open video:</span>
+          <input
+            className="open-by-name-input"
+            value={openName}
+            onChange={(e) => setOpenName(e.target.value)}
+            placeholder="Video ID"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') openByName();
+            }}
+            spellCheck={false}
+          />
+          <button
+            type="button"
+            className="open-by-name-btn"
+            onClick={openByName}
+            title="Open"
+            disabled={isResolving}
+            aria-busy={isResolving ? 'true' : 'false'}
+          >
+            {isResolving ? '...' : <FontAwesomeIcon icon={faPlus} />}
+          </button>
+        </div>
+      </div>
+      
+      {/* Results area */}
       <div className="results-scroll">
         {isSearching && (
           <div className="results-overlay" aria-hidden="true">
@@ -93,6 +167,12 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
 
         {error ? (
           <div className="error-box">{error}</div>
+        ) : null}
+
+        {openError ? (
+          <div className="error-box" role="alert" aria-live="assertive">
+            {openError}
+          </div>
         ) : null}
         
         {/* Flat mode */}
@@ -157,9 +237,10 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
           )
         )}
 
-        <VideoPreviewModal 
-          item={selectedItem} 
-          onClose={onClosePreview}
+        <VideoPreviewModal
+          key={previewData?.video_path || previewData?.video_id || 'none'}
+          data={previewData}
+          onClose={closePreview}
         />
       </div>
     </main>

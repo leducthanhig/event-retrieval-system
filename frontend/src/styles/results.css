@@ -19,7 +19,7 @@
   display: flex;
   align-self: stretch;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;;
   gap: 24px;
   z-index: 1;
   box-sizing: border-box;
@@ -31,12 +31,17 @@
   gap: 12px;
 }
 
-.topbar-item { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+.topbar-item { 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 6px; 
+  font-size: 0.9rem;
+}
 
 .results-topbar select {
-  height: 20px;              /* tăng chiều cao box */
-  line-height: 36px;         /* căn giữa chữ theo chiều dọc */
-  padding: 0 2px;            /* padding ngang */
+  height: 20px;
+  line-height: 36px;
+  padding: 0 2px;
   border: 1px solid #4b5563;
   border-radius: 2px;
   background-color: #1e1e1e;
@@ -50,6 +55,53 @@
   border: 1px solid #4b5563;
   border-radius: 2px;
   box-shadow: none;
+}
+
+.open-by-name-btn {
+  width: 25px;
+  height: 25px;
+  padding: 0px;
+  line-height: 1;
+  border-radius: 6px;
+  border: 'none';
+  background-color: #242424;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.open-by-name-btn:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid transparent;
+}
+
+.open-by-name-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.open-by-name-label {
+  font-size: 0.9rem;
+  color: #e2e8f0;
+  margin-right: 0px;
+  white-space: nowrap;
+}
+
+.open-by-name-input {
+  height: 24px;
+  width: 80px;
+  padding: 0 4px;
+  border: 1px solid #d1d5db;
+  border-radius: 2px;
+  color: #e2e8f0;
+  font-size: 0.8rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, background-color 0.2s;
+  margin-right: 0px;
 }
 
 .results-topbar { display: flex; }

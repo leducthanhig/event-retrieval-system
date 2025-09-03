@@ -5,7 +5,7 @@ import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
 export default function VideoPreview({ data, onClose }) {
   if (!data) return null;
 
-  const videoUrl = `/videos?url=${data.video_path}`;
+  const videoUrl = `/videos?url=${encodeURIComponent(data.video_path)}`;
   const videoRef = useRef(null);
 
   // Frame math helpers
