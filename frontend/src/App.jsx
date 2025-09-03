@@ -9,19 +9,9 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [selectedModels, setSelectedModels] = useState(['siglip2']);
   const [weights, setWeights] = useState({ siglip2: '1.0', siglip: '0.0', quickgelu: '0.0' });
-
-  // Search control states
-  const [isSearching, setIsSearching] = useState(false);
-  const [isRewriting, setIsRewriting] = useState(false);
-
-  // Results & selection
   const [results, setResults] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null); // for preview modal/video
-
-  // temporal search toggle
-  const [temporalMode, setTemporalMode] = useState(false); 
-
-  // Weights for different modalities
+  const [temporalMode, setTemporalMode] = useState(false);
   const [modalityWeights, setModalityWeights] = useState({
     text: 1.0,
     image: 0.0,
@@ -29,13 +19,19 @@ export default function App() {
     metadata: 0.0,
   });
 
+  // Map UI model keys to backend payload format
+  const MODEL_MAP = {
+    siglip2:   { name: 'ViT-B-16-SigLIP2-384', pretrained: 'webli' },
+    siglip:    { name: 'ViT-L-16-SigLIP-256',   pretrained: 'webli' },
+    quickgelu: { name: 'ViT-L-14-quickgelu',    pretrained: 'dfn2b' },
+  };
+
   // Active search modes (tabs)
   const [activeTabs, setActiveTabs] = useState(['text']);
   const toggleTab = (id) => {
     setActiveTabs(prev => {
       const on = prev.includes(id);
       const next = on ? prev.filter(t => t !== id) : [...prev, id];
-      // sync weight 0 when off
       if (on) setModalityWeights(w => ({ ...w, [id]: 0.0 }));
       return next;
     });
@@ -53,7 +49,7 @@ export default function App() {
   }, [activeTabs, setModalityWeights]);
 
   // API hooks
-  const { search, rewrite, loading, error, setError } = useSearch({
+  const { search, rewrite, isSearching, isRewriting, error, setError } = useSearch({
     onResults: (items) => setResults(items || []),
   });
 
@@ -64,178 +60,88 @@ export default function App() {
     setTemporalMode(false);
   };
 
-  // Unified way to fail a search: set error, clear results, stop spinner
-  const failSearch = (msg) => {
-    setError(msg);
-    clearResults();
-    setIsSearching(false);
-  };
-
-  const handleSearch = async ({ 
-      modes, 
-      imageFile, 
-      transcriptQuery, 
-      metadataQuery, 
-      modalityWeights: mwOverride 
-    } = {}) => {
-
-    // Fallback: if modes is missing, default to text-only
+  const onSearch = async ({
+    modes,
+    imageFile,
+    transcriptQuery,
+    metadataQuery,
+    modalityWeights: mwOverride,
+  } = {}) => {
+    setError('');
     const resolvedModes = modes ?? { text: true, image: false, transcription: false, metadata: false };
 
-    const MODEL_MAP = {
-      siglip2:   { name: 'ViT-B-16-SigLIP2-384', pretrained: 'webli' },
-      siglip:    { name: 'ViT-L-16-SigLIP-256',   pretrained: 'webli' },
-      quickgelu: { name: 'ViT-L-14-quickgelu',    pretrained: 'dfn2b' },
+    // Map selected models to backend payload format
+    const n = selectedModels.length;
+    const modelsPayload =
+      n === 1 ? MODEL_MAP[selectedModels[0]] : selectedModels.map((k) => MODEL_MAP[k]);
+
+    // Parse topK with safe fallback
+    const top = parseInt(topK, 10) || 100;
+
+    // Prepare params for the hook
+    const params = {
+      top,
+      pooling_method: 'max',
+      models: modelsPayload,
     };
 
-    const n = selectedModels.length;
-    const modelsPayload = (n === 1)
-      ? MODEL_MAP[selectedModels[0]]
-      : selectedModels.map(k => MODEL_MAP[k]);
-
-    setError('');
-    setIsSearching(true);
-
-    try {
-      const fd = new FormData(); // always multipart
-
-      // Validate search modes
-      if (!resolvedModes.text && !resolvedModes.image && !resolvedModes.transcription && !resolvedModes.metadata) {
-        return failSearch('Please select at least one search mode.');
-      }
-
-      // Validate modality weights
-      const activeKeys = ['text', 'image', 'transcription', 'metadata'].filter(k => resolvedModes[k]);
-      const mw = mwOverride ?? modalityWeights ?? {};
-      if (activeKeys.length >= 2) {
-        const ws = activeKeys.map(k => Number(mw?.[k] ?? 0));
-        if (ws.some(x => Number.isNaN(x))) {
-          return failSearch('Please enter valid decimal modality weights.');
-        }
-        const sum = ws.reduce((a,b)=>a+b, 0);
-        const roundedSum = Math.round(sum * 10) / 10; // round to nearest 0.1
-        if (roundedSum !== 1.0) {
-          return failSearch('Modality weights must sum exactly to 1.');
-        }
-        // send attached weights to backend with same keynames
-        fd.append(
-          'modality_weights', 
-          JSON.stringify(activeKeys.reduce((obj, k, i) => ((obj[k] = ws[i]), obj), {}))
-        );
-      } else if (activeKeys.length === 1) {
-        // 1 mode: skip weights
-      }
-
-      // Validate top-k
-      const k = parseInt(topK, 10);
-      if (Number.isNaN(k) || k <= 0 || k > 500) {
-        return failSearch('Top-K must be an integer between 1 and 500.');
-      }
-
-      // TEXT branch
-      if (resolvedModes.text) {
-        const q = (query || '').trim();
-        if (!q) {
-          return failSearch('Please enter a text query.');
-        }
-        fd.append('text_query', q);
-        fd.append('models', JSON.stringify(modelsPayload));
-        if (n >= 2) {
-          const ws = selectedModels.map(k => Number(weights[k]));
-          const rounded = Math.round(ws.reduce((a,b)=>a+b,0) * 10) / 10;
-          if (Number.isNaN(rounded) || rounded !== 1.0) {
-            return failSearch('Weights must sum exactly to 1.');
-          }
-          fd.append('model_weights', JSON.stringify(ws));
-        }
-      }
-
-      // IMAGE branch
-      if (resolvedModes.image) {
-        if (!imageFile) {
-          return failSearch('Please upload an image.');
-        }
-        fd.append('image_query', imageFile);
-      }
-
-      // TRANSCRIPT branch
-      if (resolvedModes.transcription) {
-        const tq = (transcriptQuery || '').trim();
-        if (!tq) {
-          return failSearch('Please enter a transcription query.');
-        }
-        if (tq) fd.append('transcription_query', tq);
-      }
-
-      // METADATA branch
-      if (resolvedModes.metadata) {
-        const mq = (metadataQuery || '').trim();
-        if (!mq) {
-          return failSearch('Please enter a metadata query.');
-        }
-        if (mq) fd.append('metadata_query', mq);
-      }
-
-      // Pooling & top
-      fd.append('pooling_method', 'max');
-
-      // Attach previous_results for Temporal Search
-      if (temporalMode && results && results.length > 0) {
-        fd.append('previous_results', JSON.stringify(results)); 
-      }
-
-      const url = `/search?top=${k || 100}`;
-      const res = await fetch(url, { method: 'POST', body: fd });
-      if (!res.ok) throw new Error(`Search failed with status ${res.status}`);
-      const data = await res.json();
-      setResults(data?.results || []);
-
-      // Keep temporal mode ON until user toggles it off
-      if (temporalMode) setTemporalMode(false);
-
-    } catch (e) {
-      console.error('Search error:', e);
-      clearResults();
-      setError('Error calling API: ' + (e?.message || 'unknown'));
-    } finally {
-      setIsSearching(false);
+    // If multiple models: attach model_weights
+    if (n >= 2) {
+      params.model_weights = selectedModels.map((k) => Number(weights[k]));
     }
+
+    // Handle modality weights when more than one mode is active
+    const mw = mwOverride ?? modalityWeights ?? {};
+    if (Object.values(resolvedModes).filter(Boolean).length >= 2) {
+      const picked = {};
+      ['text', 'image', 'transcription', 'metadata'].forEach((k) => {
+        if (resolvedModes[k]) picked[k] = Number(mw[k] ?? 0);
+      });
+      params.modality_weights = picked;
+    }
+
+    // Add optional queries for each modality
+    const q = (query || '').trim();
+    if (resolvedModes.image && imageFile) {
+      params.image_query = imageFile;
+    }
+    if (resolvedModes.transcription && transcriptQuery?.trim()) {
+      params.transcription_query = transcriptQuery.trim();
+    }
+    if (resolvedModes.metadata && metadataQuery?.trim()) {
+      params.metadata_query = metadataQuery.trim();
+    }
+    if (temporalMode && results?.length) {
+      params.previous_results = results;
+    }
+
+    await search(q, params);
+
+    // Turn off temporal mode after search
+    if (temporalMode) setTemporalMode(false);
   };
 
-  const handleRewrite = async () => {
+  const onRewrite = async () => {
     setError('');
-    setIsRewriting(true);
-    try {
-      // validate query
-      const q = (query || '').trim();
-      if (!q) {
-        return failSearch('Please enter a text query.');
-      }
-
-      const MODEL_MAP = {
-      siglip2: { name: 'ViT-B-16-SigLIP2-384', pretrained: 'webli' },
-      siglip:  { name: 'ViT-L-16-SigLIP-256', pretrained: 'webli' },
-      quickgelu: { name: 'ViT-L-14-quickgelu', pretrained: 'dfn2b' },
-    };
 
     const first = selectedModels[0];
     const clip_model = first ? MODEL_MAP[first] : undefined;
-    const data = await rewrite({
-      text: query,
+
+    const { ok, data } = await rewrite({
+      text: (query || '').trim(),
       model: 'gemini-2.5-flash-lite',
       clip_model,
       thinking: false,
     });
-     if (data?.rewritten_query) {
-        setQuery(data.rewritten_query);
-     }
-    } finally {
-      setIsRewriting(false);
+
+    if (ok && data?.rewritten_query) {
+      setQuery(data.rewritten_query);
     }
   };
 
   return (
     <Home
+      // Query and configuration
       query={query}
       setQuery={setQuery}
       topK={topK}
@@ -248,23 +154,26 @@ export default function App() {
       setSelectedModels={setSelectedModels}
       weights={weights}
       setWeights={setWeights}
+
+      // Results and interactions
       results={results}
-      setSelectedItem={setSelectedItem}
-      onSearch={handleSearch}
-      onRewrite={handleRewrite}
-      loading={loading}
-      isSearching={isSearching}
-      isRewriting={isRewriting}
-      error={error}
       selectedItem={selectedItem}
+      setSelectedItem={setSelectedItem}
       temporalMode={temporalMode}
       setTemporalMode={setTemporalMode}
+
+      // API actions
+      onSearch={onSearch}
+      onRewrite={onRewrite}
       onSimilarSearch={(file) =>
-        handleSearch({
+        onSearch({
           modes: { text: false, image: true, transcription: false, metadata: false },
           imageFile: file,
         })
       }
+      isSearching={isSearching}
+      isRewriting={isRewriting}
+      error={error}
     />
   );
 }

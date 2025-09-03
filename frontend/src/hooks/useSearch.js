@@ -1,25 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
-// Encapsulate /search (GET with query params) and /rewrite (POST).
-export default function useSearch({ onResults }) {
-  const [loading, setLoading] = useState(false);
+export default function useSearch({ onResults } = {}) {
+  const [isSearching, setIsSearching] = useState(false);
+  const [isRewriting, setIsRewriting] = useState(false);
   const [error, setError] = useState('');
 
-  // Helper: build URL with safe query params
-  const buildUrl = (base, params) => {
-    const usp = new URLSearchParams();
-    Object.entries(params || {}).forEach(([k, v]) => {
-      if (v === undefined || v === null) return;
-      // arrays -> repeat key
-      if (Array.isArray(v)) {
-        v.forEach((item) => usp.append(k, String(item)));
-      } else {
-        usp.set(k, String(v));
-      }
-    });
-    return `${base}?${usp.toString()}`;
-  };
+  // Keep a reference to the active search request to support cancelation
+  const activeSearchController = useRef(null);
 
+  /** Helper: join base + path safely */
+  const joinUrl = (path) => path;
+
+  /** Helper: extract a meaningful error string out of a Response */
   const extractError = async (res) => {
     try {
       const data = await res.json();
@@ -30,94 +22,144 @@ export default function useSearch({ onResults }) {
         if (typeof data.detail === 'string') return data.detail;
       }
       return JSON.stringify(data);
-    } catch (_e) {
-      try { return await res.text(); } catch { return ''; }
+    } catch {
+      try {
+        return await res.text();
+      } catch {
+        return '';
+      }
     }
   };
 
-  /**
-   * Search: now GET /search with query params to match backend
-   * Expected minimal params: q (text), top (default 100)
-   * We also pass optional params to preserve features: pooling_method, mode, weights[], model_name, pretrained
-   */
-  const search = async (q, params) => {
+  const search = async (q, params = {}) => {
+    // Cancel previous search if still running
+    if (activeSearchController.current) {
+      activeSearchController.current.abort();
+    }
+    const controller = new AbortController();
+    activeSearchController.current = controller;
+
     try {
-      setLoading(true);
+      setIsSearching(true);
       setError('');
 
-      const url = `http://localhost:8000/search?q=${encodeURIComponent(q)}&top=${encodeURIComponent(params?.top ?? 100)}`;
+      // Build URL with top as query param (server reads top from query)
+      const top = params?.top ?? 100;
+      const url = joinUrl(`/search?top=${encodeURIComponent(top)}`);
 
-      // Body: using FormData (multipart/form-data)
+      // Build multipart body
       const fd = new FormData();
+
+      // Text query
+      if (typeof q === 'string' && q.trim().length > 0) {
+        fd.append('text_query', q.trim());
+      }
+
+      // Core knobs
       fd.append('pooling_method', params?.pooling_method ?? 'max');
+
+      // Model selection / weights
       if (params?.models) {
         fd.append('models', JSON.stringify(params.models));
+      }
+      if (Array.isArray(params?.model_weights)) {
+        fd.append('model_weights', JSON.stringify(params.model_weights.map(Number)));
       }
       if (Array.isArray(params?.clip_weights)) {
         fd.append('clip_weights', JSON.stringify(params.clip_weights.map(Number)));
       }
-      if (Array.isArray(params?.weights)) {
-        fd.append('weights', JSON.stringify(params.weights.map(Number)));
+
+      // Multimodal knobs
+      if (params?.modality_weights && typeof params.modality_weights === 'object') {
+        fd.append('modality_weights', JSON.stringify(params.modality_weights));
       }
       if (params?.image_query instanceof File || params?.image_query instanceof Blob) {
         fd.append('image_query', params.image_query);
       }
+      if (typeof params?.transcription_query === 'string' && params.transcription_query.trim()) {
+        fd.append('transcription_query', params.transcription_query.trim());
+      }
+      if (typeof params?.metadata_query === 'string' && params.metadata_query.trim()) {
+        fd.append('metadata_query', params.metadata_query.trim());
+      }
 
+      // Temporal search
+      if (params?.previous_results) {
+        fd.append('previous_results', JSON.stringify(params.previous_results));
+      }
+
+      // Fire request
       const res = await fetch(url, {
         method: 'POST',
         body: fd,
+        signal: controller.signal,
       });
 
+      // Handle non-2xx
       if (!res.ok) {
         const msg = await extractError(res);
         setError(msg || `Search failed (${res.status})`);
         onResults?.([]);
-        return;
+        return { ok: false, error: msg || `HTTP ${res.status}` };
       }
 
+      // Parse JSON
       const data = await res.json();
-      onResults?.(Array.isArray(data?.results) ? data.results : data);
-    } catch (e) {
-      setError('Search failed due to network/server error.');
-      onResults?.([]);
+      const items = Array.isArray(data?.results) ? data.results : data;
+      onResults?.(items);
+      return { ok: true, data: items };
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        setError('Search failed due to network/server error.');
+        onResults?.([]);
+      }
+      return { ok: false, error: err?.message };
     } finally {
-      setLoading(false);
+      // Clear controller if this call is the active one
+      if (activeSearchController.current === controller) {
+        activeSearchController.current = null;
+      }
+      setIsSearching(false);
     }
   };
 
-  // /rewrite -> POST JSON to /rewrite
-  const rewrite = async ({ text, model = 'gemini-2.5-flash-lite', clip_model, thinking = false }) => {
+  const rewrite = async (payload) => {
+    console.log('[onRewrite] called');
     try {
-      setLoading(true);
+      setIsRewriting(true);
       setError('');
 
-      const payload = {
-        text,
-        model,
-        thinking,
-        ...(clip_model ? { clip_model } : {}),
-      };
-
-      const res = await fetch('http://localhost:8000/rewrite', {
+      const url = joinUrl('/rewrite');
+      const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload ?? {}),
       });
 
       if (!res.ok) {
         const msg = await extractError(res);
         setError(msg || `Rewrite failed (${res.status})`);
-        return;
+        return { ok: false, error: msg || `HTTP ${res.status}` };
       }
-      
+
       const data = await res.json();
-      return data;
-    } catch (e) {
+      return { ok: true, data };
+    } catch {
       setError('Rewrite failed due to network/server error.');
+      return { ok: false, error: 'Network/Server error' };
     } finally {
-      setLoading(false);
+      setIsRewriting(false);
     }
   };
 
-  return { search, rewrite, loading, error, setError };
+  return {
+    search,
+    rewrite,
+    isSearching, 
+    isRewriting,
+    error,
+    setError,
+  };
 }
