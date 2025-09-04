@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfo, faPlay, faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons';
 
 // Render one thumbnail + action area below (info + preview buttons)
-export default function ResultCard({ item, onSelect, onSimilarSearch }) {
+export default function ResultCard({ item, onSimilarSearch }) {
   const [openInfo, setOpenInfo] = useState(false);
   const [previewData, setPreviewData] = useState(null);
 
@@ -45,7 +45,6 @@ export default function ResultCard({ item, onSelect, onSimilarSearch }) {
         className="thumb"
         src={thumbUrl}
         alt="Thumbnail"
-        onClick={onSelect}
       />
 
       {/* Actions area below thumbnail */}
