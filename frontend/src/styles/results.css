@@ -8,6 +8,12 @@
   min-height: 0;
 }
 
+.results-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .results-topbar {
   flex: 0 0 auto;
   width: 100%;
@@ -102,18 +108,6 @@
   box-sizing: border-box;
   transition: border-color 0.2s, background-color 0.2s;
   margin-right: 0px;
-}
-
-.results-topbar { display: flex; }
-.results-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
-
-.results-scroll {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 16px;
-  scrollbar-gutter: stable ;
-  padding-right: 2px;
 }
 
 .error-box {
@@ -212,7 +206,20 @@
   opacity: 1;
 }
 
-.results-scroll { position: relative; }
+.results-scroll {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+  padding-right: 2px;
+  scrollbar-gutter: stable;
+}
+
+.results-scroll.is-locked {
+  overflow: hidden;
+  touch-action: none;
+}
 
 .results-overlay {
   position: absolute;
@@ -223,7 +230,8 @@
   justify-content: center;
   gap: 8px;
   background: rgba(0,0,0,0.8);
-  z-index: 5;
+  z-index: 3;
+  pointer-events: auto;
 }
 
 .icon-btn {

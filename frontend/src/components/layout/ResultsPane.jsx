@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import '../../styles/results.css';
 import ResultsGrid from '../results/ResultsGrid';
 import VideoPreviewModal from '../results/VideoPreview';
@@ -23,6 +23,14 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
     const m = s.replace(/^s/i, '').match(/\d+/);
     return m ? parseInt(m[0], 10) : Number.MAX_SAFE_INTEGER;
   };
+
+  // Scroll to top when results change
+  const resultsScrollRef = useRef(null);
+  useEffect(() => {
+    if (resultsScrollRef.current) {
+      resultsScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [results]);
 
   // Toggle a single video's collapsed state
   const toggleCollapse = useCallback((videoId) => {
@@ -157,91 +165,93 @@ export default function ResultsPane({ results, onSelect, selectedItem, onClosePr
       </div>
       
       {/* Results area */}
-      <div className="results-scroll">
+      <div className="results-body">
+        <div ref={resultsScrollRef} className={`results-scroll ${isSearching ? 'is-locked' : ''}`}>
+          {error ? (
+            <div className="error-box">{error}</div>
+          ) : null}
+
+          {openError ? (
+            <div className="error-box" role="alert" aria-live="assertive">
+              {openError}
+            </div>
+          ) : null}
+          
+          {/* Flat mode */}
+          {!groupByVideo && (
+            <ResultsGrid
+              results={results}
+              onSelect={onSelect}
+              onSimilarSearch={onSimilarSearch}
+              error={error}
+            />
+          )}
+
+          {/* Grouped mode */}
+          {groupByVideo && (
+            grouped && grouped.length > 0 ? (
+              <div className="grouped-results">
+                {grouped.map((g) => {
+                  // Whether this group's items are collapsed
+                  const isCollapsed = collapsedById.has(g.videoId);
+
+                  return (
+                    <section key={g.videoId} className="video-group">
+                      <button
+                        type="button"
+                        className="video-group__title-button"
+                        aria-expanded={!isCollapsed}
+                        onClick={() => toggleCollapse(g.videoId)}
+                      >
+                        <span
+                          className="twisty"
+                          aria-hidden="true"
+                          data-collapsed={isCollapsed ? 'true' : 'false'}
+                        >
+                          {isCollapsed ? '▸' : '▾'}
+                        </span>
+                        <span className="video-group__title-text">
+                          {g.title} <span className="video-group__count">({g.items.length})</span>
+                        </span>
+                      </button>
+
+                      {/* Only render items when expanded for performance */}
+                      {!isCollapsed && (
+                        <ResultsGrid
+                          results={g.items}
+                          onSelect={onSelect}
+                          onSimilarSearch={onSimilarSearch}
+                          disableInternalSort
+                        />
+                      )}
+                    </section>
+                  );
+                })}
+              </div>
+            ) : (
+              <ResultsGrid
+                results={[]}
+                error={error}
+                onSelect={onSelect}
+                onSimilarSearch={onSimilarSearch}
+                disableInternalSort
+              />
+            )
+          )}
+
+          <VideoPreviewModal
+            key={previewData?.video_path || previewData?.video_id || 'none'}
+            data={previewData}
+            onClose={closePreview}
+          />
+        </div>
+
         {isSearching && (
           <div className="results-overlay" aria-hidden="true">
             <div className="results-spinner" />
             <div className="results-searching__text">Searching</div>
           </div>
         )}
-
-        {error ? (
-          <div className="error-box">{error}</div>
-        ) : null}
-
-        {openError ? (
-          <div className="error-box" role="alert" aria-live="assertive">
-            {openError}
-          </div>
-        ) : null}
-        
-        {/* Flat mode */}
-        {!groupByVideo && (
-          <ResultsGrid
-            results={results}
-            onSelect={onSelect}
-            onSimilarSearch={onSimilarSearch}
-            error={error}
-          />
-        )}
-
-        {/* Grouped mode */}
-        {groupByVideo && (
-          grouped && grouped.length > 0 ? (
-            <div className="grouped-results">
-              {grouped.map((g) => {
-                // Whether this group's items are collapsed
-                const isCollapsed = collapsedById.has(g.videoId);
-
-                return (
-                  <section key={g.videoId} className="video-group">
-                    <button
-                      type="button"
-                      className="video-group__title-button"
-                      aria-expanded={!isCollapsed}
-                      onClick={() => toggleCollapse(g.videoId)}
-                    >
-                      <span
-                        className="twisty"
-                        aria-hidden="true"
-                        data-collapsed={isCollapsed ? 'true' : 'false'}
-                      >
-                        {isCollapsed ? '▸' : '▾'}
-                      </span>
-                      <span className="video-group__title-text">
-                        {g.title} <span className="video-group__count">({g.items.length})</span>
-                      </span>
-                    </button>
-
-                    {/* Only render items when expanded for performance */}
-                    {!isCollapsed && (
-                      <ResultsGrid
-                        results={g.items}
-                        onSelect={onSelect}
-                        onSimilarSearch={onSimilarSearch}
-                        disableInternalSort
-                      />
-                    )}
-                  </section>
-                );
-              })}
-            </div>
-          ) : (
-            <ResultsGrid
-              results={[]}
-              error={error}
-              onSelect={onSelect}
-              onSimilarSearch={onSimilarSearch}
-              disableInternalSort
-            />
-          )
-        )}
-
-        <VideoPreviewModal
-          key={previewData?.video_path || previewData?.video_id || 'none'}
-          data={previewData}
-          onClose={closePreview}
-        />
       </div>
     </main>
   );
