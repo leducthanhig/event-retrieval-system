@@ -24,6 +24,10 @@ start-backend-prod:
 start-frontend:
 	npm run dev --prefix frontend
 
+start-frontend-prod:
+	npm run build --prefix frontend
+	npm run preview --prefix frontend
+
 install-es:
 	curl -fsSL https://elastic.co/start-local | sh -s -- --esonly
 
