@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
+import { faWandMagicSparkles, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
 
-export default function TextSearch({ query, setQuery, onSearch, onRewrite, isRewriting, loading }) {
+export default function TextSearch({ query, setQuery, onSearch, onRewrite, isRewriting, loading, historyItems = [] }) {
   const taRef = useRef(null);
   const [reachedMax, setReachedMax] = useState(false);
   const [maxPx, setMaxPx] = useState(() => Math.floor(window.innerHeight * 0.4));
+  const [showHistory, setShowHistory] = useState(false);
 
   // Auto-resize textarea to fit content height
   const autoResize = () => {
@@ -43,6 +44,14 @@ export default function TextSearch({ query, setQuery, onSearch, onRewrite, isRew
   };
 
   const disableRewrite = loading || isRewriting || !query?.trim();
+  const disableHistory = loading || isRewriting;
+
+  // Pick a history item: replace the entire query
+  const pickHistory = (txt) => {
+    setQuery(txt);
+    setShowHistory(false);
+    requestAnimationFrame(() => taRef.current?.focus());
+  };
 
   return (
     <div className="query-field">
@@ -56,7 +65,7 @@ export default function TextSearch({ query, setQuery, onSearch, onRewrite, isRew
         onInput={autoResize}
         onKeyDown={handleKeyDown}
         spellCheck={false}
-        rows={2}
+        rows={3}
         readOnly={isRewriting}
         aria-busy={isRewriting ? 'true' : 'false'}
         aria-label="Query"
@@ -91,6 +100,39 @@ export default function TextSearch({ query, setQuery, onSearch, onRewrite, isRew
         </div>
       )}
 
+      <FontAwesomeIcon
+        icon={faClockRotateLeft}
+        title="Search history"
+        className={`history-icon-svg${disableHistory ? ' disabled' : ''}${showHistory ? ' active' : ''}`}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => !disableHistory && setShowHistory(v => !v)}
+        aria-expanded={showHistory ? 'true' : 'false'}
+        aria-controls="history-panel"
+        aria-pressed={showHistory ? 'true' : 'false'}
+      />
+
+      {/* History dropdown/panel */}
+      {showHistory && historyItems?.length > 0 && (
+        <div
+          id="history-panel"
+          className="history-panel"
+          role="listbox"
+          aria-label="Text search history"
+        >
+          {historyItems.map((it, idx) => (
+            <button
+              key={idx}
+              type="button"
+              role="option"
+              className="history-item"
+              onClick={() => pickHistory(it.text)}
+              title={it.text}
+            >
+              {it.text}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

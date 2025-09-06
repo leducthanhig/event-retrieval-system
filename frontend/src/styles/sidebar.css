@@ -22,6 +22,12 @@
 .query-textarea::-webkit-scrollbar { width: 6px; }
 .query-textarea::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
 
+.history-panel { scrollbar-width: thin; }
+.history-panel::-webkit-scrollbar { width: 6px; }
+.history-panel { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.history-panel::-webkit-scrollbar { width: 6px; }
+.history-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+
 .ner-btn {
   flex: 1;
   padding: 6px 12px;
@@ -73,7 +79,7 @@ button:focus {
 .rewrite-icon-svg {
   position: absolute;
   top: 8px;
-  right: 8px;
+  right: 10px;
   width: 18px;
   height: 18px;
   color: cyan;
@@ -106,6 +112,74 @@ button:focus {
 
 @keyframes rewrite-spin {
   to { transform: rotate(360deg); }
+}
+
+.history-icon-svg {
+  position: absolute;
+  top: 40px;
+  right: 10px;
+  width: 18px;
+  height: 18px;
+  color: #93c5fd;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 5px;
+  box-sizing: content-box;
+  transition: background-color 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+}
+
+.history-icon-svg:hover,
+.history-icon-svg.active {
+  color: #ffffff;
+  background: #1f3a8a;
+}
+
+
+.history-icon-svg.disabled {
+  opacity: 1; 
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.history-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0px);
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 2px;
+  max-height: 260px;
+  overflow: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  z-index: 20;
+  padding: 2px;
+}
+
+.history-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  padding: 8px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+
+  /* fixed height feel */
+  line-height: 1.2;
+  height: 32px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.history-item:hover,
+.history-item:focus {
+  background: #111827;
+  outline: none;
 }
 
 .clock-btn {

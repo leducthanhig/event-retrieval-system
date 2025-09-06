@@ -9,6 +9,7 @@ export default function Home(props) {
     modalityWeights, setModalityWeights,
     selectedModels, setSelectedModels,
     weights, setWeights,
+    searchHistory,
     results, setSelectedItem,
     onSearch, onRewrite,
     loading, error,
@@ -34,6 +35,8 @@ export default function Home(props) {
         setSelectedModels={setSelectedModels}
         weights={weights}
         setWeights={setWeights}
+        searchHistory={searchHistory}
+
         onSearch={onSearch}
         onRewrite={onRewrite}
         loading={loading}

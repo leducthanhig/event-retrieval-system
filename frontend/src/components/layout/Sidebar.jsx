@@ -18,6 +18,7 @@ export default function Sidebar(props) {
     modalityWeights, setModalityWeights,
     selectedModels, setSelectedModels,
     weights, setWeights,
+    searchHistory,
     onSearch,
     onRewrite,
     loading, error,
@@ -86,6 +87,7 @@ export default function Sidebar(props) {
                 onRewrite={(q) => onRewrite?.(q)}
                 isRewriting={isRewriting}
                 loading={loading}
+                historyItems={searchHistory}
                 compact
               />
               <div style={{ marginTop: 4 }}>

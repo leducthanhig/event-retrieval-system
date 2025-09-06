@@ -48,6 +48,35 @@ export default function App() {
     });
   }, [activeTabs, setModalityWeights]);
 
+  // Session-scoped text search history
+  const [searchHistory, setSearchHistory] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('text_search_history');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Persist to sessionStorage on change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('text_search_history', JSON.stringify(searchHistory));
+    } catch {}
+  }, [searchHistory]);
+
+  // Helper: push to history (dedupe head, max 50)
+  const pushHistory = (text) => {
+    const q = (text || '').trim();
+    if (!q) return;
+    setSearchHistory(prev => {
+      if (prev.length && prev[0]?.text === q) return prev; // no immediate dup
+      const next = [{ text: q, ts: Date.now() }, ...prev.filter(it => it?.text !== q)];
+      return next.slice(0, 50);
+    });
+  };
+
   // API hooks
   const { search, rewrite, isSearching, isRewriting, error, setError } = useSearch({
     onResults: (items) => setResults(items || []),
@@ -168,6 +197,11 @@ export default function App() {
     // Call the hook
     const { ok, error: err } = await search(q, params);
     
+    // On text search success -> push to history
+    if (ok && resolvedModes.text && q) {
+      pushHistory(q);
+    }
+
     // Optional: If server still returns error, mirror behavior
     if (!ok && err) {
       clearResults();
@@ -212,6 +246,7 @@ export default function App() {
       setSelectedModels={setSelectedModels}
       weights={weights}
       setWeights={setWeights}
+      searchHistory={searchHistory}
 
       // Results and interactions
       results={results}
