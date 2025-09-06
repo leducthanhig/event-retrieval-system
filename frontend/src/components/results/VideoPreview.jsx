@@ -238,7 +238,7 @@ export default function VideoPreview({ data, onClose }) {
               controls
               autoPlay
               preload="auto"
-              style={{ width: '100%', borderRadius: 6 }}
+              style={{ width: '100%', maxHeight: '75vh', borderRadius: 6 }}
               tabIndex="0" // Ensure the video element is focusable
             />
             <div style={{ marginTop: 0, color: '#fff' }}>
