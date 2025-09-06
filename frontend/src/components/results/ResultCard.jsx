@@ -8,8 +8,10 @@ import { faInfo, faPlay, faMagnifyingGlass } from '@fortawesome/free-solid-svg-i
 export default function ResultCard({ item, onSimilarSearch }) {
   const [openInfo, setOpenInfo] = useState(false);
   const [previewData, setPreviewData] = useState(null);
+  const [imgError, setImgError] = useState(false);
 
   const thumbUrl = item?.thumbnail ? `/${item.thumbnail}` : '';
+  const hasThumb = Boolean(thumbUrl) && !imgError;
 
   const handlePreview = async () => {
     try {
@@ -41,11 +43,21 @@ export default function ResultCard({ item, onSimilarSearch }) {
 
   return (
     <div className="result-card">
-      <img
-        className="thumb"
-        src={thumbUrl}
-        alt="Thumbnail"
-      />
+      <div className="thumb-wrap">
+        {hasThumb ? (
+          <img
+            className="thumb"
+            src={thumbUrl}
+            alt={item?.video_title || 'Thumbnail'}
+            onError={() => setImgError(true)}
+            loading="lazy"
+          />
+        ) : (
+          <div className="thumb-fallback">
+            Thumbnail unavailable
+          </div>
+        )}
+      </div>
 
       {/* Actions area below thumbnail */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, paddingTop: 0 }}>

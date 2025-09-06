@@ -306,3 +306,32 @@
   color: #d1d5db;
   margin-left: 4px;
 }
+
+.result-card .thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #2f3540;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.result-card .thumb {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.result-card .thumb-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: #3e4652;
+  color: #ffffff;
+  font-size: 0.9rem;
+  text-align: center;
+}
