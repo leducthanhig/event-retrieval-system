@@ -60,6 +60,12 @@ export default function App() {
     setTemporalMode(false);
   };
 
+  // Unified way to fail a search: set error, clear results
+  const failSearch = (msg) => {
+    setError(msg);
+    clearResults();
+  };
+
   const onSearch = async ({
     modes,
     imageFile,
@@ -68,54 +74,104 @@ export default function App() {
     modalityWeights: mwOverride,
   } = {}) => {
     setError('');
+
+    // Resolve active modes
     const resolvedModes = modes ?? { text: true, image: false, transcription: false, metadata: false };
+    const activeKeys = ['text','image','transcription','metadata'].filter(k => resolvedModes[k]);
+    if (activeKeys.length === 0) {
+      return failSearch('Please select at least one search mode.');
+    }
+
+    // Validate Top-K
+    const k = parseInt(topK, 10);
+    if (Number.isNaN(k) || k <= 0 || k > 500) {
+      return failSearch('Top-K must be an integer between 1 and 500.');
+    }
 
     // Map selected models to backend payload format
     const n = selectedModels.length;
-    const modelsPayload =
-      n === 1 ? MODEL_MAP[selectedModels[0]] : selectedModels.map((k) => MODEL_MAP[k]);
+    const modelsPayload = (n === 1) 
+      ? MODEL_MAP[selectedModels[0]] 
+      : selectedModels.map(k => MODEL_MAP[k]);
 
     // Parse topK with safe fallback
     const top = parseInt(topK, 10) || 100;
 
-    // Prepare params for the hook
+    if (n >= 2) {
+      const ws = selectedModels.map(k => Number(weights[k]));
+      if (ws.some(x => Number.isNaN(x))) {
+        return failSearch('Model weights must be decimals.');
+      }
+      const sum = ws.reduce((a,b)=>a+b, 0);
+      const roundedSum = Math.round(sum * 10) / 10;
+      if (roundedSum !== 1.0) {
+        return failSearch('Model weights must sum exactly to 1.');
+      }
+    }
+
+    // Validate per-modality inputs
+    const q = (query || '').trim();
+    if (resolvedModes.text) {
+      if (!q) return failSearch('Please enter a text query.');
+    }
+    if (resolvedModes.image) {
+      if (!imageFile) return failSearch('Please upload an image.');
+    }
+    if (resolvedModes.transcription) {
+      const tq = (transcriptQuery || '').trim();
+      if (!tq) return failSearch('Please enter a transcription query.');
+    }
+    if (resolvedModes.metadata) {
+      const mq = (metadataQuery || '').trim();
+      if (!mq) return failSearch('Please enter a metadata query.');
+    }
+
+    // Validate modality weights when combining >=2 modes
+    const mw = mwOverride ?? modalityWeights ?? {};
+    if (activeKeys.length >= 2) {
+      const ws = activeKeys.map(k => Number(mw?.[k] ?? 0));
+      if (ws.some(x => Number.isNaN(x))) {
+        return failSearch('Please enter valid decimal modality weights.');
+      }
+      const sum = ws.reduce((a,b)=>a+b, 0);
+      const roundedSum = Math.round(sum * 10) / 10; // snap to 0.1
+      if (roundedSum !== 1.0) {
+        return failSearch('Modality weights must sum exactly to 1.');
+      }
+    }
+
+    // Build params for hook (safe after all validations)
     const params = {
-      top,
+      top: k,
       pooling_method: 'max',
       models: modelsPayload,
     };
+    if (n >= 2) params.model_weights = selectedModels.map(k => Number(weights[k]));
 
-    // If multiple models: attach model_weights
-    if (n >= 2) {
-      params.model_weights = selectedModels.map((k) => Number(weights[k]));
-    }
-
-    // Handle modality weights when more than one mode is active
-    const mw = mwOverride ?? modalityWeights ?? {};
-    if (Object.values(resolvedModes).filter(Boolean).length >= 2) {
+    if (activeKeys.length >= 2) {
       const picked = {};
-      ['text', 'image', 'transcription', 'metadata'].forEach((k) => {
-        if (resolvedModes[k]) picked[k] = Number(mw[k] ?? 0);
+      ['text', 'image', 'transcription', 'metadata'].forEach((key) => {
+        if (resolvedModes[key]) picked[key] = Number((mw ?? {})[key] ?? 0);
       });
       params.modality_weights = picked;
     }
 
-    // Add optional queries for each modality
-    const q = (query || '').trim();
-    if (resolvedModes.image && imageFile) {
+    if (resolvedModes.image && imageFile) 
       params.image_query = imageFile;
-    }
-    if (resolvedModes.transcription && transcriptQuery?.trim()) {
+    if (resolvedModes.transcription && transcriptQuery?.trim()) 
       params.transcription_query = transcriptQuery.trim();
-    }
-    if (resolvedModes.metadata && metadataQuery?.trim()) {
+    if (resolvedModes.metadata && metadataQuery?.trim()) 
       params.metadata_query = metadataQuery.trim();
-    }
-    if (temporalMode && results?.length) {
+    if (temporalMode && results?.length) 
       params.previous_results = results;
-    }
 
-    await search(q, params);
+    // Call the hook
+    const { ok, error: err } = await search(q, params);
+    
+    // Optional: If server still returns error, mirror behavior
+    if (!ok && err) {
+      clearResults();
+    }
 
     // Turn off temporal mode after search
     if (temporalMode) setTemporalMode(false);
@@ -123,6 +179,8 @@ export default function App() {
 
   const onRewrite = async () => {
     setError('');
+    const q = (query || '').trim();
+    if (!q) return failSearch('Please enter a text query.');
 
     const first = selectedModels[0];
     const clip_model = first ? MODEL_MAP[first] : undefined;
