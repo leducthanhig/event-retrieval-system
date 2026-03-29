@@ -156,7 +156,7 @@ Organize your data as follows:
 - `data/videos/`: Place your raw video files here. The offline pipeline will read from this directory to process videos.
 - `data/media-info/`: Place JSON files containing media information (title, description, keywords, etc.) here. These will be indexed in Elasticsearch for metadata search.
 
-The data used for the preliminary round of the HCMC AI Challenge 2025 can be found [here](https://huggingface.co/datasets/leducthanhig/hcmc-aic-2025).
+The data provided for the preliminary round of the HCMC AI Challenge 2025 can be found [here](https://huggingface.co/datasets/leducthanhig/hcmc-aic-2025) and the processed data can be accessed via this [link](https://www.kaggle.com/datasets/irongolemmc/hcmc-aic-2025-data).
 
 ### Prepare searchable data
 
