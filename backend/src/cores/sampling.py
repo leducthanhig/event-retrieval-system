@@ -102,7 +102,12 @@ class FrameSampler:
         return embeddings.cpu().numpy()
 
     def sample_frames(self, video_id: str, threshold=0.9, batch_size=64):
-        """Sample frames bases on cosine similarity of embeddings."""
+        """Sample frames bases on cosine similarity of embeddings.
+
+        Adapted from **M9** sampling method from the paper:
+            **"An Empirical Comparison of Video Frame Sampling Methods for Multi-Modal RAG Retrieval"**
+            https://arxiv.org/abs/2408.03340
+        """
         sampled_indices = []
         prev_emb = None
         shots = self.metadata[video_id]['shots']
