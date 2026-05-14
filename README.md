@@ -116,7 +116,7 @@ flowchart LR
     class FUSION,TEMP core;
 ```
 
-**How to read this diagram:** The top flow prepares searchable data in advance (offline), while the bottom flow handles live user search (online). Arrow labels show what data is passed between steps.
+**How to read this diagram:** The top pipeline handles online retrieval requests, while the bottom pipeline prepares searchable data through offline indexing and preprocessing.
 
 ## Setup Instructions
 
