@@ -1,6 +1,10 @@
 # Event Retrieval System
 
-This repository implements a multimodal video event retrieval system that indexes shot-level keyframes and text metadata/transcriptions, then retrieves relevant video moments from text, image, transcription, or metadata queries using vector search and full-text search. It also supports temporal search by chaining continuously provided queries across steps. Especially, this system is used for the preliminary round of the [HCMC AI Challenge 2025](https://aichallenge.hochiminhcity.gov.vn/).
+A multimodal video retrieval system developed for the preliminary round of the [HCMC AI Challenge 2025](https://aichallenge.hochiminhcity.gov.vn/).
+
+The system indexes shot-level keyframes, transcriptions, and metadata from videos, then retrieves relevant video moments using text, image, transcription, or metadata queries through hybrid vector and keyword search.
+
+It also supports temporal retrieval by refining search results across sequential user queries.
 
 ## Technology Stack
 
@@ -24,56 +28,92 @@ Note: `DINOv3` is a gated model that requires a Hugging Face account with access
 
 ## Key Features
 
-- Multimodal retrieval with text, image, transcription, and metadata queries.
-- Shot-level keyframe indexing for precise video moment discovery.
-- Hybrid search combining vector similarity (FAISS) and full-text retrieval (Elasticsearch).
-- Query rewriting support using Gemini to improve text-query expressiveness.
-- Weighted result fusion across modalities with configurable pooling and ranking.
-- Temporal search over continuous query sequences for multi-step event refinement.
-- End-to-end pipeline for shot detection, frame sampling, feature extraction, and indexing.
+- Multimodal retrieval using text, image, transcription, and metadata queries.
+- Shot-level keyframe indexing for precise video moment retrieval.
+- Hybrid retrieval combining FAISS vector search and Elasticsearch keyword search.
+- Temporal retrieval across sequential user queries.
+- Query rewriting using Gemini for improved text-query retrieval.
+- Configurable score fusion across multiple retrieval modalities.
+- Modular offline indexing and online serving pipelines.
+- End-to-end processing pipeline for shot detection, frame sampling, feature extraction, and indexing.
 
 ## System Architecture
 
 ```mermaid
 flowchart LR
-    %% Offline indexing pipeline
-    subgraph Offline[Offline Data Processing & Indexing]
-        V[(Videos)] -->|raw video files| SD[TransNetV2 Shot Detection]
-        SD -->|shot boundaries| FS[FFmpeg Frame Sampling]
-        FS -->|sampled frames| KF[(Keyframes)]
-        KF -->|image tensors| FE["Feature Extraction (OpenCLIP + DINOv3)"]
-        FE -->|embedding vectors| FI[(FAISS Indexes)]
 
-        V -->|audio stream| ASR[Faster-Whisper ASR]
-        ASR -->|speech segments| TR[(Transcriptions)]
-        MI[(Media Info JSON)] -->|title/description/keywords| EI[Elasticsearch Indexing]
-        TR -->|transcribed text| EI
-        EI -->|inverted indexes| ES[(Elasticsearch Indexes)]
+    %% =========================
+    %% Offline Pipeline
+    %% =========================
+    subgraph OFFLINE["Offline Indexing Pipeline"]
+
+        V[(Videos)]
+        META[(Metadata JSON)]
+
+        SD[Shot Detection<br/>TransNetV2]
+        FS[Frame Sampling<br/>FFmpeg]
+        FE[Feature Extraction<br/>OpenCLIP + DINOv3]
+        ASR[Speech Transcription<br/>Faster Whisper]
+
+        FI[(FAISS Index)]
+        ES[(Elasticsearch Index)]
+
+        V --> SD --> FS --> FE --> FI
+        V --> ASR --> ES
+        META --> ES
+
     end
 
-    %% Online retrieval pipeline
-    subgraph Online[Online Search & Serving]
-        U[User] -->|text/image/metadata query| UI[React + Vite Frontend]
-        UI -->|search request payload| API[FastAPI Backend]
-        API -->|optional prior step results| PR[Previous Results Context]
-        API -->|text query| QR[Gemini Query Rewriter]
-        API -->|normalized request| RT[Retriever Core]
-        QR -->|rewritten query| RT
-        PR -->|temporal context| RT
+    %% =========================
+    %% Online Pipeline
+    %% =========================
+    subgraph ONLINE["Online Retrieval Pipeline"]
 
-        RT -->|text/image embeddings| VS[Vector Search]
-        VS -->|nearest-neighbor lookup| FI
+        U[User Query]
+        UI[React Frontend]
+        API[FastAPI Backend]
 
-        RT -->|metadata/transcription query| TS[Text Search]
-        TS -->|BM25/full-text lookup| ES
+        QR[Query Rewriting<br/>Gemini]
 
-        FI -->|candidate shots + scores| FUSION[Score Fusion + Ranking]
-        ES -->|candidate shots + scores| FUSION
-        FUSION -->|single-step ranked results| API
-        FUSION -->|multi-step candidates| TEMP[Temporal Result Chaining]
-        TEMP -->|temporal-ranked results| API
-        API -->|final ranked shots| UI
+        VS[Vector Search]
+        TS[Keyword Search]
+
+        FUSION[Hybrid Fusion<br/>+ Ranking]
+        TEMP[Temporal Retrieval]
+
+        R[(Ranked Results)]
+
+        U --> UI --> API
+
+        API --> QR
+        API --> VS
+        QR --> TS
+
+        QR --> VS
+        API --> TS
+
+        VS --> FI
+        TS --> ES
+
+        FI --> FUSION
+        ES --> FUSION
+
+        FUSION --> TEMP --> R
+
     end
+
+    %% =========================
+    %% Styling
+    %% =========================
+    classDef source fill:#e0f2fe,stroke:#0284c7,color:#0f172a;
+    classDef process fill:#dcfce7,stroke:#16a34a,color:#0f172a;
+    classDef storage fill:#fef3c7,stroke:#d97706,color:#0f172a;
+    classDef core fill:#ede9fe,stroke:#7c3aed,color:#0f172a;
+
+    class V,META,U source;
+    class SD,FS,FE,ASR,UI,API,QR,VS,TS process;
+    class FI,ES,R storage;
+    class FUSION,TEMP core;
 ```
 
 **How to read this diagram:** The top flow prepares searchable data in advance (offline), while the bottom flow handles live user search (online). Arrow labels show what data is passed between steps.
@@ -128,7 +168,7 @@ npm install
 
 ## Configuration Guide
 
-Use `backend/src/configs.py` as the single source of truth for data paths, model choices, and search/index settings.
+Use `backend/src/configs.py` as the central configuration file for data paths, model choices, and search/index settings.
 
 - **Data locations**: `VIDEO_DIR`, `OUT_FRAME_DIR`, `VIDEO_METADATA_PATH`, `FRAME_DATA_PATH`, `MEDIA_INFO_DIR`, `WHISPER_OUTPUT_PATH`
 - **Model settings**: `CLIP_MODEL`, `CLIP_PRETRAINED`, `DINO_MODEL`, `CLIP_MODELS`, `DEFAULT_CLIP_MODEL`
@@ -186,8 +226,7 @@ npm run dev --prefix frontend
 ```
 
 ### Search in the web UI
-
-Open the frontend URL shown by Vite (typically `http://localhost:5173`) and submit queries in any supported mode:
+Open the frontend URL provided by Vite (typically `http://localhost:5173`) and submit queries using any supported search mode. 
 
 - Text query
 - Image query
